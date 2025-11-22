@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b:*)",
+      "Bash(python:*)",
+      "Bash(echo:*)",
+      "Bash(build.bat)",
+      "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\build.bat'' -ItemType File -Force\")",
+      "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\build_simple.bat'' -ItemType File -Force\")",
+      "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\打包说明.txt'' -ItemType File -Force\")",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

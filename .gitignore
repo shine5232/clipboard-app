@@ -1,0 +1,15 @@
+build/ClipboardHelper/ClipboardHelper.pkg
+build/ClipboardHelper/Analysis-00.toc
+build/ClipboardHelper/base_library.zip
+build/ClipboardHelper/EXE-00.toc
+build/ClipboardHelper/PKG-00.toc
+build/ClipboardHelper/PYZ-00.pyz
+build/ClipboardHelper/PYZ-00.toc
+build/ClipboardHelper/warn-ClipboardHelper.txt
+build/ClipboardHelper/xref-ClipboardHelper.html
+build/ClipboardHelper/localpycs/pyimod01_archive.pyc
+build/ClipboardHelper/localpycs/pyimod02_importers.pyc
+build/ClipboardHelper/localpycs/pyimod03_ctypes.pyc
+build/ClipboardHelper/localpycs/pyimod04_pywin32.pyc
+build/ClipboardHelper/localpycs/struct.pyc
+dist/ClipboardHelper.exe

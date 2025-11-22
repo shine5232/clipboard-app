@@ -1,0 +1,74 @@
+========================================
+  Clipboard Helper - Build Instructions
+========================================
+
+## Quick Start (Recommended)
+
+1. Double-click: build.bat
+2. Wait 1-2 minutes
+3. Get: dist\ClipboardHelper.exe
+
+That's it!
+
+========================================
+
+## Alternative Methods
+
+### Method 1: Use quick_build.bat
+- Faster, less verbose output
+- Double-click quick_build.bat
+
+### Method 2: Manual Command Line
+Open Command Prompt in this folder, then run:
+
+    pip install pyinstaller
+    pyinstaller --name=ClipboardHelper --onefile --windowed main.py
+
+The exe file will be in: dist\ClipboardHelper.exe
+
+========================================
+
+## Build Options Explained
+
+--name=ClipboardHelper   → Output filename
+--onefile               → Single exe file
+--windowed              → No console window
+--noconfirm             → Overwrite without asking
+
+========================================
+
+## Troubleshooting
+
+### Issue: "pyinstaller is not recognized"
+Solution: Install it first
+    pip install pyinstaller
+
+### Issue: Build fails with import errors
+Solution: Install dependencies
+    pip install PyQt5 pyperclip pywin32 pynput
+
+### Issue: Exe file is too large (30-50MB)
+This is normal - it includes Python and all libraries
+
+### Issue: Antivirus blocks the exe
+This is a false positive - PyInstaller apps are often flagged
+Add to antivirus exceptions
+
+========================================
+
+## Distribution
+
+After building:
+- Only distribute: dist\ClipboardHelper.exe
+- Users don't need Python installed
+- First run will create a 'data' folder automatically
+
+========================================
+
+## Hotkeys
+
+Ctrl+Space       : Batch paste all copied items
+Ctrl+Shift+C     : Show/Hide window
+Ctrl+Shift+Q     : Quit application
+
+========================================

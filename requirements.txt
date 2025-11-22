@@ -1,0 +1,5 @@
+PyQt5>=5.15.0
+pynput>=1.7.6
+pyperclip>=1.8.2
+pywin32>=311
+PyInstaller>=6.0.0
