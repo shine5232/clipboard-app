@@ -23,7 +23,8 @@ from pathlib import Path
 from functools import partial
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QListWidget, QLabel, QListWidgetItem,
-                             QMessageBox, QMenu, QAction, QSystemTrayIcon)
+                             QMessageBox, QMenu, QAction, QSystemTrayIcon,
+                             QDialog, QComboBox, QFormLayout, QFrame)
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer
 from PyQt5.QtGui import QIcon, QFont, QBrush, QColor
 import win32clipboard
@@ -144,6 +145,473 @@ def set_clipboard_text(text):
     return False
 
 
+class SettingsDialog(QDialog):
+    """设置对话框"""
+
+    def __init__(self, parent=None, settings=None):
+        super().__init__(parent)
+        self.settings = settings or {'output_mode': 'comma', 'theme': 'light'}
+        self.temp_settings = self.settings.copy()
+        self.init_ui()
+
+    def init_ui(self):
+        """初始化设置界面"""
+        self.setWindowTitle('设置')
+        self.setFixedSize(380, 300)
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+
+        # 主容器
+        main_container = QWidget()
+        main_container.setObjectName('settingsContainer')
+
+        # 添加阴影效果
+        from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setOffset(0, 4)
+        shadow.setColor(QColor(0, 0, 0, 40))
+        main_container.setGraphicsEffect(shadow)
+
+        # 主布局
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 标题栏
+        header = self.create_header()
+        main_layout.addWidget(header)
+
+        # 内容区域
+        content = QWidget()
+        content.setObjectName('settingsContent')
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(20, 20, 20, 15)
+        content_layout.setSpacing(20)
+
+        # 输出模式配置
+        output_group = self.create_setting_row(
+            '输出模式',
+            '选择粘贴时的输出方式',
+            ['逗号拼接', '顺序输出', '倒序输出'],
+            {'comma': 0, 'sequential': 1, 'reverse': 2}.get(self.settings.get('output_mode'), 0),
+            'output_mode'
+        )
+        content_layout.addWidget(output_group)
+
+        # 系统主题配置
+        theme_group = self.create_setting_row(
+            '系统主题',
+            '选择界面显示主题',
+            ['日间模式', '暗夜模式'],
+            0 if self.settings.get('theme') == 'light' else 1,
+            'theme'
+        )
+        content_layout.addWidget(theme_group)
+
+        content_layout.addStretch()
+
+        # 按钮区域
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+        button_layout.addStretch()
+
+        self.apply_btn = QPushButton('应用')
+        self.apply_btn.setObjectName('applyBtn')
+        self.apply_btn.setFixedSize(70, 32)
+        self.apply_btn.clicked.connect(self.apply_settings)
+        button_layout.addWidget(self.apply_btn)
+
+        self.ok_btn = QPushButton('确定')
+        self.ok_btn.setObjectName('okBtn')
+        self.ok_btn.setFixedSize(70, 32)
+        self.ok_btn.clicked.connect(self.accept_settings)
+        button_layout.addWidget(self.ok_btn)
+
+        self.cancel_btn = QPushButton('取消')
+        self.cancel_btn.setObjectName('cancelBtn')
+        self.cancel_btn.setFixedSize(70, 32)
+        self.cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_btn)
+
+        content_layout.addLayout(button_layout)
+        content.setLayout(content_layout)
+        main_layout.addWidget(content)
+
+        main_container.setLayout(main_layout)
+
+        # 外层布局
+        outer_layout = QVBoxLayout()
+        outer_layout.setContentsMargins(10, 10, 10, 10)
+        outer_layout.addWidget(main_container)
+        self.setLayout(outer_layout)
+
+        # 应用样式
+        self.apply_style()
+
+    def create_header(self):
+        """创建标题栏"""
+        from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient
+        from PyQt5.QtCore import QRectF
+
+        class HeaderWidget(QWidget):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.is_dark = False
+
+            def paintEvent(self, event):
+                painter = QPainter(self)
+                painter.setRenderHint(QPainter.Antialiasing)
+                path = QPainterPath()
+                rect = QRectF(self.rect())
+                radius = 10
+                path.moveTo(rect.left(), rect.bottom())
+                path.lineTo(rect.left(), rect.top() + radius)
+                path.quadTo(rect.left(), rect.top(), rect.left() + radius, rect.top())
+                path.lineTo(rect.right() - radius, rect.top())
+                path.quadTo(rect.right(), rect.top(), rect.right(), rect.top() + radius)
+                path.lineTo(rect.right(), rect.bottom())
+                path.lineTo(rect.left(), rect.bottom())
+                gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
+                if self.is_dark:
+                    # 暗夜模式：更深的渐变色
+                    gradient.setColorAt(0, QColor('#4a5568'))
+                    gradient.setColorAt(1, QColor('#2d3748'))
+                else:
+                    # 日间模式：原有的渐变色
+                    gradient.setColorAt(0, QColor('#667eea'))
+                    gradient.setColorAt(1, QColor('#764ba2'))
+                painter.fillPath(path, gradient)
+
+            def setDarkMode(self, is_dark):
+                self.is_dark = is_dark
+                self.update()
+
+        header = HeaderWidget()
+        self.settings_header = header  # 保存引用以便后续更新
+        header.setFixedHeight(45)
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(15, 0, 15, 0)
+
+        title = QLabel('设置')
+        title.setStyleSheet('color: white; font-size: 15px; font-weight: 600; background: transparent;')
+        layout.addWidget(title)
+        layout.addStretch()
+
+        close_btn = QPushButton('×')
+        close_btn.setFixedSize(20, 20)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 4px;
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(255, 100, 100, 0.8);
+            }
+        """)
+        close_btn.clicked.connect(self.reject)
+        layout.addWidget(close_btn)
+
+        header.setLayout(layout)
+
+        # 拖拽支持
+        header.mousePressEvent = self.header_mouse_press
+        header.mouseMoveEvent = self.header_mouse_move
+
+        return header
+
+    def header_mouse_press(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def header_mouse_move(self, event):
+        if hasattr(self, 'drag_position'):
+            self.move(event.globalPos() - self.drag_position)
+            event.accept()
+
+    def create_setting_row(self, title, description, options, current_index, setting_key):
+        """创建设置行"""
+        from PyQt5.QtWidgets import QStyledItemDelegate, QListView
+        from PyQt5.QtCore import QSize
+
+        group = QWidget()
+        group.setObjectName('settingGroup')
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(15)
+
+        # 左侧标签区域
+        label_widget = QWidget()
+        label_layout = QVBoxLayout()
+        label_layout.setContentsMargins(0, 0, 0, 0)
+        label_layout.setSpacing(4)
+
+        title_label = QLabel(title)
+        title_label.setObjectName('settingTitle')
+        label_layout.addWidget(title_label)
+
+        desc_label = QLabel(description)
+        desc_label.setObjectName('settingDesc')
+        label_layout.addWidget(desc_label)
+
+        label_widget.setLayout(label_layout)
+        layout.addWidget(label_widget)
+        layout.addStretch()
+
+        # 自定义下拉项委托
+        class ComboItemDelegate(QStyledItemDelegate):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+
+            def sizeHint(self, option, index):
+                return QSize(100, 36)
+
+        # 右侧下拉框
+        combo = QComboBox()
+        combo.setObjectName('settingCombo')
+        combo.setFixedSize(120, 34)
+
+        # 设置下拉视图
+        list_view = QListView()
+        list_view.setItemDelegate(ComboItemDelegate())
+        combo.setView(list_view)
+
+        # 设置下拉框最大显示项数
+        combo.setMaxVisibleItems(5)
+
+        combo.addItems(options)
+        combo.setCurrentIndex(current_index)
+        combo.currentIndexChanged.connect(lambda idx: self.on_setting_changed(setting_key, idx))
+        layout.addWidget(combo)
+
+        # 保存下拉框引用
+        setattr(self, f'{setting_key}_combo', combo)
+
+        group.setLayout(layout)
+        return group
+
+    def on_setting_changed(self, key, index):
+        """设置项变化时的处理"""
+        if key == 'output_mode':
+            mode_map = {0: 'comma', 1: 'sequential', 2: 'reverse'}
+            self.temp_settings['output_mode'] = mode_map.get(index, 'comma')
+        elif key == 'theme':
+            self.temp_settings['theme'] = 'light' if index == 0 else 'dark'
+
+    def apply_settings(self):
+        """应用设置（不关闭对话框）"""
+        self.settings.update(self.temp_settings)
+        # 更新设置对话框自身的主题样式
+        self.apply_style()
+        # 更新主窗口的设置
+        if self.parent():
+            self.parent().apply_settings(self.settings)
+
+    def accept_settings(self):
+        """确定并关闭"""
+        self.apply_settings()
+        self.accept()
+
+    def apply_style(self):
+        """应用样式"""
+        is_dark = self.settings.get('theme') == 'dark'
+        # 更新标题栏主题
+        if hasattr(self, 'settings_header'):
+            self.settings_header.setDarkMode(is_dark)
+        self.update_style(is_dark)
+
+    def update_style(self, is_dark=False):
+        """更新样式"""
+        if is_dark:
+            self.setStyleSheet("""
+                #settingsContainer {
+                    background: #1e1e1e;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 10px;
+                }
+                #settingsContent {
+                    background: #1e1e1e;
+                    border-bottom-left-radius: 10px;
+                    border-bottom-right-radius: 10px;
+                }
+                #settingTitle {
+                    color: #e0e0e0;
+                    font-size: 14px;
+                    font-weight: 500;
+                }
+                #settingDesc {
+                    color: #888888;
+                    font-size: 12px;
+                }
+                #settingCombo {
+                    background: #2d2d2d;
+                    color: #e0e0e0;
+                    border: 1px solid #444444;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    padding-right: 25px;
+                    font-size: 13px;
+                }
+                #settingCombo:hover {
+                    border-color: #5a6678;
+                }
+                #settingCombo::drop-down {
+                    border: none;
+                    width: 20px;
+                    subcontrol-position: right center;
+                    subcontrol-origin: padding;
+                    right: 5px;
+                }
+                #settingCombo QAbstractItemView {
+                    background: #2d2d2d;
+                    color: #e0e0e0;
+                    border: 1px solid #444444;
+                    border-radius: 8px;
+                    padding: 6px;
+                    outline: none;
+                    selection-background-color: transparent;
+                }
+                #settingCombo QAbstractItemView::item {
+                    height: 36px;
+                    padding: 8px 12px;
+                    margin: 3px 4px;
+                    border-radius: 6px;
+                    background: transparent;
+                    color: #e0e0e0;
+                }
+                #settingCombo QAbstractItemView::item:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(74, 85, 104, 0.4), stop:1 rgba(45, 55, 72, 0.4));
+                }
+                #settingCombo QAbstractItemView::item:selected {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #4a5568, stop:1 #2d3748);
+                    color: white;
+                }
+                #applyBtn, #okBtn {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #4a5568, stop:1 #2d3748);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                #applyBtn:hover, #okBtn:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #5a6678, stop:1 #3d4758);
+                }
+                #cancelBtn {
+                    background: #3d3d3d;
+                    color: #e0e0e0;
+                    border: 1px solid #555555;
+                    border-radius: 6px;
+                    font-size: 13px;
+                }
+                #cancelBtn:hover {
+                    background: #4d4d4d;
+                    border-color: #666666;
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                #settingsContainer {
+                    background: #ffffff;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 10px;
+                }
+                #settingsContent {
+                    background: #ffffff;
+                    border-bottom-left-radius: 10px;
+                    border-bottom-right-radius: 10px;
+                }
+                #settingTitle {
+                    color: #303133;
+                    font-size: 14px;
+                    font-weight: 500;
+                }
+                #settingDesc {
+                    color: #909399;
+                    font-size: 12px;
+                }
+                #settingCombo {
+                    background: #f5f7fa;
+                    color: #303133;
+                    border: 1px solid #dcdfe6;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    padding-right: 25px;
+                    font-size: 13px;
+                }
+                #settingCombo:hover {
+                    border-color: #667eea;
+                }
+                #settingCombo::drop-down {
+                    border: none;
+                    width: 20px;
+                    subcontrol-position: right center;
+                    subcontrol-origin: padding;
+                    right: 5px;
+                }
+                #settingCombo QAbstractItemView {
+                    background: #ffffff;
+                    color: #303133;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 8px;
+                    padding: 6px;
+                    outline: none;
+                    selection-background-color: transparent;
+                }
+                #settingCombo QAbstractItemView::item {
+                    height: 36px;
+                    padding: 8px 12px;
+                    margin: 3px 4px;
+                    border-radius: 6px;
+                    background: transparent;
+                    color: #303133;
+                }
+                #settingCombo QAbstractItemView::item:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(102, 126, 234, 0.15), stop:1 rgba(118, 75, 162, 0.15));
+                }
+                #settingCombo QAbstractItemView::item:selected {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #667eea, stop:1 #764ba2);
+                    color: white;
+                }
+                #applyBtn, #okBtn {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #667eea, stop:1 #764ba2);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+                #applyBtn:hover, #okBtn:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #7b8eef, stop:1 #8b5fb5);
+                }
+                #cancelBtn {
+                    background: #f5f7fa;
+                    color: #606266;
+                    border: 1px solid #dcdfe6;
+                    border-radius: 6px;
+                    font-size: 13px;
+                }
+                #cancelBtn:hover {
+                    background: #e8edf5;
+                    border-color: #c0c4cc;
+                }
+            """)
+
+
 class ClipboardWindow(QWidget):
     """剪贴板悬浮窗"""
 
@@ -159,6 +627,11 @@ class ClipboardWindow(QWidget):
         # 数据存储
         self.clipboard_data = []
         self.data_file = Path(__file__).parent / 'data' / 'clipboard_data.json'
+        self.settings_file = Path(__file__).parent / 'data' / 'settings.json'
+
+        # 设置
+        self.settings = {'output_mode': 'comma', 'theme': 'light'}
+        self.load_settings()
 
         # 拖拽相关
         self.dragging = False
@@ -168,6 +641,7 @@ class ClipboardWindow(QWidget):
         self.last_pasted_text = ""
         self.last_paste_time = 0  # 最后一次粘贴的时间戳
         self.paste_ignore_until = 0  # 时间戳，在此之前忽略剪贴板变化
+        self.sequential_index = -1  # 顺序输出模式的当前索引（从最后一项开始）
 
         # 初始化UI
         self.init_ui()
@@ -189,6 +663,12 @@ class ClipboardWindow(QWidget):
 
         # 初始化系统托盘图标
         self.init_tray_icon()
+
+        # 应用保存的主题
+        self.apply_theme(self.settings.get('theme', 'light'))
+
+        # 更新模式标识
+        self.update_mode_label()
 
     def register_clipboard_listener(self):
         """注册 Windows 剪贴板监听器"""
@@ -240,14 +720,16 @@ class ClipboardWindow(QWidget):
                     added_count += 1
 
             if added_count > 0:
+                self.sequential_index = -1  # 重置顺序输出索引
                 self.update_list()
                 self.save_data()
 
-                # 显示通知
-                if added_count == 1:
-                    self.show_notification(f'已复制: {texts[0][:20]}...' if len(texts[0]) > 20 else f'已复制: {texts[0]}')
-                else:
-                    self.show_notification(f'已添加 {added_count} 项')
+                # 只在窗口隐藏时显示通知
+                if not self.isVisible():
+                    if added_count == 1:
+                        self.show_notification(f'已复制: {texts[0][:20]}...' if len(texts[0]) > 20 else f'已复制: {texts[0]}')
+                    else:
+                        self.show_notification(f'已添加 {added_count} 项')
         except Exception as e:
             print(f"处理剪贴板变化失败: {e}")
 
@@ -278,29 +760,67 @@ class ClipboardWindow(QWidget):
     def do_paste(self):
         """执行批量粘贴：自动粘贴到当前位置"""
         if not self.clipboard_data:
-            self.show_notification('剪贴板为空')
             return
 
-        # 拼接所有文本
-        texts = [item['text'] if isinstance(item, dict) else item for item in self.clipboard_data]
-        combined_text = ','.join(texts)
+        output_mode = self.settings.get('output_mode', 'comma')
 
-        # 记录粘贴的内容和时间，防止被重新添加到列表
-        self.last_pasted_text = combined_text
-        self.last_paste_time = time.time()
+        if output_mode == 'sequential':
+            # 顺序输出模式：先进先出（FIFO），从第一项开始
+            # 初始化或重置索引（从第一项开始）
+            if self.sequential_index < 0 or self.sequential_index >= len(self.clipboard_data):
+                self.sequential_index = 0
 
-        # 设置忽略时间（1.5秒内忽略剪贴板变化）
-        self.paste_ignore_until = time.time() + 1.5
+            current_item = self.clipboard_data[self.sequential_index]
+            text_to_paste = current_item['text'] if isinstance(current_item, dict) else current_item
 
-        # 设置剪贴板
-        if set_clipboard_text(combined_text):
-            self.last_clipboard_text = combined_text
-            # 延迟250ms执行粘贴，确保剪贴板更新完成且用户释放快捷键
-            QTimer.singleShot(250, self._execute_paste)
+            # 记录粘贴的内容和时间
+            self.last_pasted_text = text_to_paste
+            self.last_paste_time = time.time()
+            self.paste_ignore_until = time.time() + 1.5
+
+            # 设置剪贴板
+            if set_clipboard_text(text_to_paste):
+                self.last_clipboard_text = text_to_paste
+                # 延迟250ms执行粘贴
+                QTimer.singleShot(250, lambda: self._execute_paste(mode='sequential'))
+
+        elif output_mode == 'reverse':
+            # 倒序输出模式：后入先出（LIFO），从最后一项开始
+            # 初始化或重置索引（从最后一项开始）
+            if self.sequential_index < 0 or self.sequential_index >= len(self.clipboard_data):
+                self.sequential_index = len(self.clipboard_data) - 1
+
+            current_item = self.clipboard_data[self.sequential_index]
+            text_to_paste = current_item['text'] if isinstance(current_item, dict) else current_item
+
+            # 记录粘贴的内容和时间
+            self.last_pasted_text = text_to_paste
+            self.last_paste_time = time.time()
+            self.paste_ignore_until = time.time() + 1.5
+
+            # 设置剪贴板
+            if set_clipboard_text(text_to_paste):
+                self.last_clipboard_text = text_to_paste
+                # 延迟250ms执行粘贴
+                QTimer.singleShot(250, lambda: self._execute_paste(mode='reverse'))
+
         else:
-            self.show_notification('设置剪贴板失败')
+            # 逗号拼接模式：拼接所有文本
+            texts = [item['text'] if isinstance(item, dict) else item for item in self.clipboard_data]
+            combined_text = ','.join(texts)
 
-    def _execute_paste(self):
+            # 记录粘贴的内容和时间
+            self.last_pasted_text = combined_text
+            self.last_paste_time = time.time()
+            self.paste_ignore_until = time.time() + 1.5
+
+            # 设置剪贴板
+            if set_clipboard_text(combined_text):
+                self.last_clipboard_text = combined_text
+                # 延迟250ms执行粘贴
+                QTimer.singleShot(250, lambda: self._execute_paste(mode='comma'))
+
+    def _execute_paste(self, mode='comma'):
         """执行实际的粘贴操作"""
         try:
             # 先释放所有修饰键（Ctrl、Alt、Shift）
@@ -318,12 +838,21 @@ class ClipboardWindow(QWidget):
             time.sleep(0.02)
             send_input_key(VK_CONTROL, up=True)
 
-            # 显示成功通知
-            texts_count = len(self.clipboard_data)
-            self.show_notification(f'已粘贴 {texts_count} 项内容')
+            # 根据模式移动索引
+            if mode == 'sequential':
+                # 顺序输出：向后移动
+                self.sequential_index += 1
+                # 如果到达末尾，循环回到开头
+                if self.sequential_index >= len(self.clipboard_data):
+                    self.sequential_index = 0
+            elif mode == 'reverse':
+                # 倒序输出：向前移动
+                self.sequential_index -= 1
+                # 如果到达开头，循环回到最后
+                if self.sequential_index < 0:
+                    self.sequential_index = len(self.clipboard_data) - 1
         except Exception as e:
             print(f"执行粘贴失败: {e}")
-            self.show_notification('粘贴失败')
 
     def process_clipboard_text(self, text):
         """处理剪贴板文本"""
@@ -440,10 +969,12 @@ class ClipboardWindow(QWidget):
         """创建头部"""
         from PyQt5.QtGui import QPainter, QPainterPath, QLinearGradient
 
+        parent_window = self
+
         class HeaderWidget(QWidget):
             def __init__(self, parent=None):
                 super().__init__(parent)
-                self.collapsed = False
+                self.is_dark = False
 
             def paintEvent(self, event):
                 painter = QPainter(self)
@@ -453,25 +984,28 @@ class ClipboardWindow(QWidget):
                 path = QPainterPath()
                 rect = QRectF(self.rect())
 
-                if self.collapsed:
-                    path.addRoundedRect(rect, 10, 10)
-                else:
-                    radius = 10
-                    path.moveTo(rect.left(), rect.bottom())
-                    path.lineTo(rect.left(), rect.top() + radius)
-                    path.quadTo(rect.left(), rect.top(), rect.left() + radius, rect.top())
-                    path.lineTo(rect.right() - radius, rect.top())
-                    path.quadTo(rect.right(), rect.top(), rect.right(), rect.top() + radius)
-                    path.lineTo(rect.right(), rect.bottom())
-                    path.lineTo(rect.left(), rect.bottom())
+                radius = 10
+                path.moveTo(rect.left(), rect.bottom())
+                path.lineTo(rect.left(), rect.top() + radius)
+                path.quadTo(rect.left(), rect.top(), rect.left() + radius, rect.top())
+                path.lineTo(rect.right() - radius, rect.top())
+                path.quadTo(rect.right(), rect.top(), rect.right(), rect.top() + radius)
+                path.lineTo(rect.right(), rect.bottom())
+                path.lineTo(rect.left(), rect.bottom())
 
                 gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
-                gradient.setColorAt(0, QColor('#667eea'))
-                gradient.setColorAt(1, QColor('#764ba2'))
+                if self.is_dark:
+                    # 暗夜模式：更深的渐变色
+                    gradient.setColorAt(0, QColor('#4a5568'))
+                    gradient.setColorAt(1, QColor('#2d3748'))
+                else:
+                    # 日间模式：原有的渐变色
+                    gradient.setColorAt(0, QColor('#667eea'))
+                    gradient.setColorAt(1, QColor('#764ba2'))
                 painter.fillPath(path, gradient)
 
-            def setCollapsed(self, collapsed):
-                self.collapsed = collapsed
+            def setDarkMode(self, is_dark):
+                self.is_dark = is_dark
                 self.update()
 
         header = HeaderWidget()
@@ -504,24 +1038,22 @@ class ClipboardWindow(QWidget):
         layout.addWidget(self.title_label)
         layout.addStretch()
 
-        self.toggle_btn = QPushButton('−')
-        self.toggle_btn.setFixedSize(20, 20)
-        self.toggle_btn.setToolTip('折叠/展开')
-        self.toggle_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
+        # 输出模式标识
+        self.mode_label = QLabel('拼')
+        self.mode_label.setFixedSize(20, 20)
+        self.mode_label.setAlignment(Qt.AlignCenter)
+        self.mode_label.setStyleSheet("""
+            QLabel {
+                background: rgba(255, 255, 255, 0.25);
                 border: none;
                 border-radius: 4px;
                 color: white;
-                font-size: 16px;
+                font-size: 12px;
                 font-weight: bold;
             }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.35);
-            }
         """)
-        self.toggle_btn.clicked.connect(self.toggle_collapse)
-        layout.addWidget(self.toggle_btn)
+        self.mode_label.setToolTip('当前输出模式')
+        layout.addWidget(self.mode_label)
 
         clear_btn = QPushButton()
         clear_btn.setFixedSize(20, 20)
@@ -556,6 +1088,50 @@ class ClipboardWindow(QWidget):
             }
         """)
         layout.addWidget(clear_btn)
+
+        # 设置按钮（齿轮图标）
+        settings_btn = QPushButton()
+        settings_btn.setFixedSize(20, 20)
+        settings_btn.setToolTip('设置')
+
+        # 绘制齿轮图标
+        from PyQt5.QtGui import QPixmap, QPen
+        gear_pixmap = QPixmap(20, 20)
+        gear_pixmap.fill(Qt.transparent)
+        gear_painter = QPainter(gear_pixmap)
+        gear_painter.setRenderHint(QPainter.Antialiasing)
+        gear_pen = QPen(Qt.white, 1.5)
+        gear_painter.setPen(gear_pen)
+        gear_painter.setBrush(Qt.NoBrush)
+        # 外圆（齿轮主体）
+        gear_painter.drawEllipse(5, 5, 10, 10)
+        # 内圆
+        gear_painter.drawEllipse(7, 7, 6, 6)
+        # 齿轮齿（8个方向的短线）
+        import math
+        center_x, center_y = 10, 10
+        for i in range(8):
+            angle = i * math.pi / 4
+            x1 = center_x + 5 * math.cos(angle)
+            y1 = center_y + 5 * math.sin(angle)
+            x2 = center_x + 8 * math.cos(angle)
+            y2 = center_y + 8 * math.sin(angle)
+            gear_painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+        gear_painter.end()
+
+        settings_btn.setIcon(QIcon(gear_pixmap))
+        settings_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.35);
+            }
+        """)
+        settings_btn.clicked.connect(self.show_settings)
+        layout.addWidget(settings_btn)
 
         close_btn = QPushButton('×')
         close_btn.setFixedSize(20, 20)
@@ -654,42 +1230,37 @@ class ClipboardWindow(QWidget):
     def header_mouse_release(self, event):
         self.dragging = False
 
-    def toggle_collapse(self):
-        if self.list_widget.isVisible():
-            self.list_widget.hide()
-            self.toggle_btn.setText('+')
-            self.setFixedHeight(60)
-            self.main_container.setStyleSheet("""
-                QWidget {
-                    background: transparent;
-                    border: none;
-                    border-radius: 10px;
-                }
-            """)
-            self.header.setCollapsed(True)
-        else:
-            self.list_widget.show()
-            self.toggle_btn.setText('−')
-            self.setFixedHeight(560)
-            self.main_container.setStyleSheet("""
-                QWidget {
-                    background: #ffffff;
-                    border: 1px solid rgba(102, 126, 234, 0.3);
-                    border-radius: 10px;
-                }
-            """)
-            self.header.setCollapsed(False)
+    def update_mode_label(self):
+        """更新输出模式标识"""
+        output_mode = self.settings.get('output_mode', 'comma')
+        mode_text = {
+            'comma': '拼',
+            'sequential': '顺',
+            'reverse': '倒'
+        }.get(output_mode, '拼')
+
+        mode_tooltip = {
+            'comma': '逗号拼接',
+            'sequential': '顺序输出',
+            'reverse': '倒序输出'
+        }.get(output_mode, '逗号拼接')
+
+        if hasattr(self, 'mode_label'):
+            self.mode_label.setText(mode_text)
+            self.mode_label.setToolTip(f'当前输出模式：{mode_tooltip}')
 
     def update_list(self):
         """更新列表显示"""
         self.list_widget.clear()
         self.title_label.setText(f'剪贴板 ({len(self.clipboard_data)})')
 
+        is_dark = self.settings.get('theme') == 'dark'
+
         if not self.clipboard_data:
             item = QListWidgetItem('暂无数据')
             item.setFlags(Qt.NoItemFlags)
             item.setTextAlignment(Qt.AlignCenter)
-            item.setForeground(QColor('#909399'))
+            item.setForeground(QColor('#888888' if is_dark else '#909399'))
             item.setBackground(QBrush(QColor(255, 255, 255, 0)))
             self.list_widget.addItem(item)
             return
@@ -710,18 +1281,33 @@ class ClipboardWindow(QWidget):
             text = data['text']
             timestamp = data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
 
+        is_dark = self.settings.get('theme') == 'dark'
+
         widget = QWidget()
         widget.setMinimumHeight(40)
-        widget.setStyleSheet("""
-            QWidget {
-                background: #f5f7fa;
-                border: none;
-                border-radius: 6px;
-            }
-            QWidget:hover {
-                background: #e8edf5;
-            }
-        """)
+
+        if is_dark:
+            widget.setStyleSheet("""
+                QWidget {
+                    background: #2d2d2d;
+                    border: none;
+                    border-radius: 6px;
+                }
+                QWidget:hover {
+                    background: #3d3d3d;
+                }
+            """)
+        else:
+            widget.setStyleSheet("""
+                QWidget {
+                    background: #f5f7fa;
+                    border: none;
+                    border-radius: 6px;
+                }
+                QWidget:hover {
+                    background: #e8edf5;
+                }
+            """)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(12, 8, 12, 8)
@@ -731,14 +1317,26 @@ class ClipboardWindow(QWidget):
         label.setWordWrap(False)
         label.setFixedWidth(200)
         label.setToolTip(text)
-        label.setStyleSheet("""
-            QLabel {
-                background: transparent;
-                border: none;
-                color: #303133;
-                font-size: 13px;
-            }
-        """)
+
+        if is_dark:
+            label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    border: none;
+                    color: #e0e0e0;
+                    font-size: 13px;
+                }
+            """)
+        else:
+            label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    border: none;
+                    color: #303133;
+                    font-size: 13px;
+                }
+            """)
+
         label.setTextFormat(Qt.PlainText)
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         font_metrics = label.fontMetrics()
@@ -749,14 +1347,24 @@ class ClipboardWindow(QWidget):
         layout.addStretch()
 
         time_label = QLabel(timestamp)
-        time_label.setStyleSheet("""
-            QLabel {
-                background: transparent;
-                border: none;
-                color: #909399;
-                font-size: 12px;
-            }
-        """)
+        if is_dark:
+            time_label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    border: none;
+                    color: #888888;
+                    font-size: 12px;
+                }
+            """)
+        else:
+            time_label.setStyleSheet("""
+                QLabel {
+                    background: transparent;
+                    border: none;
+                    color: #909399;
+                    font-size: 12px;
+                }
+            """)
         time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(time_label)
 
@@ -807,6 +1415,7 @@ class ClipboardWindow(QWidget):
 
         if reply == QMessageBox.Yes:
             self.clipboard_data.clear()
+            self.sequential_index = -1  # 重置顺序输出索引
             self.update_list()
             self.save_data()
             set_clipboard_text('')
@@ -854,6 +1463,175 @@ class ClipboardWindow(QWidget):
                     self.update_list()
         except Exception as e:
             print(f"加载数据失败: {e}")
+
+    def save_settings(self):
+        """保存设置"""
+        try:
+            self.settings_file.parent.mkdir(exist_ok=True)
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存设置失败: {e}")
+
+    def load_settings(self):
+        """加载设置"""
+        try:
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    loaded_settings = json.load(f)
+                    self.settings.update(loaded_settings)
+        except Exception as e:
+            print(f"加载设置失败: {e}")
+
+    def show_settings(self):
+        """显示设置对话框"""
+        dialog = SettingsDialog(self, self.settings.copy())
+        dialog.exec_()
+
+    def apply_settings(self, new_settings):
+        """应用设置"""
+        old_theme = self.settings.get('theme')
+        old_output_mode = self.settings.get('output_mode')
+        self.settings.update(new_settings)
+        self.save_settings()
+
+        # 如果输出模式改变，重置索引到起始位置
+        if new_settings.get('output_mode') != old_output_mode:
+            self.sequential_index = -1  # 重置索引，下次使用时会初始化到正确位置
+            self.update_mode_label()  # 更新模式标识
+
+        # 如果主题改变，应用新主题
+        if new_settings.get('theme') != old_theme:
+            self.apply_theme(new_settings.get('theme'))
+
+    def apply_theme(self, theme):
+        """应用主题"""
+        is_dark = theme == 'dark'
+        self.update_theme_style(is_dark)
+        self.update_list()  # 重新渲染列表以应用新主题
+
+    def update_theme_style(self, is_dark=False):
+        """更新主题样式"""
+        # 更新标题栏主题
+        if hasattr(self, 'header'):
+            self.header.setDarkMode(is_dark)
+
+        if is_dark:
+            # 暗夜模式
+            self.main_container.setStyleSheet("""
+                QWidget {
+                    background: #1e1e1e;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 10px;
+                }
+            """)
+            self.list_widget.setStyleSheet("""
+                QListWidget {
+                    background: transparent;
+                    border: none;
+                    padding: 8px;
+                    font-size: 14px;
+                }
+                QListWidget::item {
+                    background: transparent;
+                    border: none;
+                    padding: 0px;
+                }
+                QListWidget::item:disabled {
+                    background: transparent;
+                    color: #888888;
+                    border: none;
+                }
+                QListWidget::item:hover {
+                    background: transparent;
+                }
+                QListWidget::item:selected {
+                    background: transparent;
+                }
+                QScrollBar:vertical {
+                    background: transparent;
+                    width: 8px;
+                    margin: 0px;
+                    border-radius: 4px;
+                }
+                QScrollBar::handle:vertical {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(102, 126, 234, 0.5),
+                        stop:1 rgba(118, 75, 162, 0.5));
+                    min-height: 30px;
+                    border-radius: 4px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(102, 126, 234, 0.8),
+                        stop:1 rgba(118, 75, 162, 0.8));
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                    background: none;
+                }
+            """)
+        else:
+            # 日间模式
+            self.main_container.setStyleSheet("""
+                QWidget {
+                    background: #ffffff;
+                    border: 1px solid rgba(102, 126, 234, 0.3);
+                    border-radius: 10px;
+                }
+            """)
+            self.list_widget.setStyleSheet("""
+                QListWidget {
+                    background: transparent;
+                    border: none;
+                    padding: 8px;
+                    font-size: 14px;
+                }
+                QListWidget::item {
+                    background: transparent;
+                    border: none;
+                    padding: 0px;
+                }
+                QListWidget::item:disabled {
+                    background: transparent;
+                    color: #909399;
+                    border: none;
+                }
+                QListWidget::item:hover {
+                    background: transparent;
+                }
+                QListWidget::item:selected {
+                    background: transparent;
+                }
+                QScrollBar:vertical {
+                    background: transparent;
+                    width: 8px;
+                    margin: 0px;
+                    border-radius: 4px;
+                }
+                QScrollBar::handle:vertical {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(102, 126, 234, 0.3),
+                        stop:1 rgba(118, 75, 162, 0.3));
+                    min-height: 30px;
+                    border-radius: 4px;
+                    margin: 2px;
+                }
+                QScrollBar::handle:vertical:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(102, 126, 234, 0.6),
+                        stop:1 rgba(118, 75, 162, 0.6));
+                }
+                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                    height: 0px;
+                }
+                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                    background: none;
+                }
+            """)
 
     def closeEvent(self, event):
         self.save_data()

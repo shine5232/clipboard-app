@@ -8,7 +8,9 @@
       "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\build.bat'' -ItemType File -Force\")",
       "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\build_simple.bat'' -ItemType File -Force\")",
       "Bash(powershell -Command \"New-Item -Path ''E:\\clipboard-app\\打包说明.txt'' -ItemType File -Force\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(pip install:*)",
+      "Bash(\"C:\\Users\\LZ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" -m pip install PyQt5 pywin32 pynput)"
     ],
     "deny": [],
     "ask": []
