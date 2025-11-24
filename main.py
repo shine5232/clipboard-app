@@ -100,6 +100,37 @@ def send_input_key(vk, up=False):
     ctypes.windll.user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
 
 
+def get_color_scheme_colors(scheme, is_dark=False):
+    """获取配色方案的颜色
+
+    Args:
+        scheme: 配色方案 ('blue_gradient', 'pure_blue', 'pure_green')
+        is_dark: 是否为暗夜模式
+
+    Returns:
+        tuple: (color1, color2) 两个颜色值，用于渐变或纯色
+    """
+    if is_dark:
+        # 暗夜模式下的颜色
+        if scheme == 'blue_gradient':
+            return ('#4a5568', '#2d3748')  # 深灰蓝渐变
+        elif scheme == 'pure_blue':
+            return ('#5a7a9c', '#5a7a9c')  # 柔和的深蓝
+        elif scheme == 'pure_green':
+            return ('#5a8c6e', '#5a8c6e')  # 柔和的深绿
+    else:
+        # 日间模式下的颜色
+        if scheme == 'blue_gradient':
+            return ('#667eea', '#764ba2')  # 蓝紫渐变
+        elif scheme == 'pure_blue':
+            return ('#7ba3d6', '#7ba3d6')  # 柔和的天蓝
+        elif scheme == 'pure_green':
+            return ('#7fb896', '#7fb896')  # 柔和的青绿
+
+    # 默认返回蓝渐变
+    return ('#667eea', '#764ba2') if not is_dark else ('#4a5568', '#2d3748')
+
+
 def get_clipboard_text():
     """安全地获取剪贴板文本，支持重试"""
     max_retries = 3
@@ -150,7 +181,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None, settings=None):
         super().__init__(parent)
-        self.settings = settings or {'output_mode': 'comma', 'theme': 'light'}
+        self.settings = settings or {'output_mode': 'comma', 'theme': 'light', 'color_scheme': 'pure_blue'}
         self.temp_settings = self.settings.copy()
         self.init_ui()
 
@@ -209,6 +240,16 @@ class SettingsDialog(QDialog):
         )
         content_layout.addWidget(theme_group)
 
+        # 配色方案配置
+        color_scheme_group = self.create_setting_row(
+            '配色方案',
+            '选择界面的配色风格',
+            ['蓝渐变', '纯蓝色', '纯绿色'],
+            {'blue_gradient': 0, 'pure_blue': 1, 'pure_green': 2}.get(self.settings.get('color_scheme', 'pure_blue'), 0),
+            'color_scheme'
+        )
+        content_layout.addWidget(color_scheme_group)
+
         content_layout.addStretch()
 
         # 按钮区域
@@ -258,6 +299,7 @@ class SettingsDialog(QDialog):
             def __init__(self, parent=None):
                 super().__init__(parent)
                 self.is_dark = False
+                self.color_scheme = 'pure_blue'
 
             def paintEvent(self, event):
                 painter = QPainter(self)
@@ -273,18 +315,19 @@ class SettingsDialog(QDialog):
                 path.lineTo(rect.right(), rect.bottom())
                 path.lineTo(rect.left(), rect.bottom())
                 gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
-                if self.is_dark:
-                    # 暗夜模式：更深的渐变色
-                    gradient.setColorAt(0, QColor('#4a5568'))
-                    gradient.setColorAt(1, QColor('#2d3748'))
-                else:
-                    # 日间模式：原有的渐变色
-                    gradient.setColorAt(0, QColor('#667eea'))
-                    gradient.setColorAt(1, QColor('#764ba2'))
+
+                # 获取配色方案的颜色
+                color1, color2 = get_color_scheme_colors(self.color_scheme, self.is_dark)
+                gradient.setColorAt(0, QColor(color1))
+                gradient.setColorAt(1, QColor(color2))
                 painter.fillPath(path, gradient)
 
             def setDarkMode(self, is_dark):
                 self.is_dark = is_dark
+                self.update()
+
+            def setColorScheme(self, scheme):
+                self.color_scheme = scheme
                 self.update()
 
         header = HeaderWidget()
@@ -403,6 +446,9 @@ class SettingsDialog(QDialog):
             self.temp_settings['output_mode'] = mode_map.get(index, 'comma')
         elif key == 'theme':
             self.temp_settings['theme'] = 'light' if index == 0 else 'dark'
+        elif key == 'color_scheme':
+            scheme_map = {0: 'blue_gradient', 1: 'pure_blue', 2: 'pure_green'}
+            self.temp_settings['color_scheme'] = scheme_map.get(index, 'pure_blue')
 
     def apply_settings(self):
         """应用设置（不关闭对话框）"""
@@ -421,35 +467,40 @@ class SettingsDialog(QDialog):
     def apply_style(self):
         """应用样式"""
         is_dark = self.settings.get('theme') == 'dark'
-        # 更新标题栏主题
+        color_scheme = self.settings.get('color_scheme', 'pure_blue')
+        # 更新标题栏主题和配色方案
         if hasattr(self, 'settings_header'):
             self.settings_header.setDarkMode(is_dark)
-        self.update_style(is_dark)
+            self.settings_header.setColorScheme(color_scheme)
+        self.update_style(is_dark, color_scheme)
 
-    def update_style(self, is_dark=False):
+    def update_style(self, is_dark=False, color_scheme='pure_blue'):
         """更新样式"""
+        # 获取配色方案的颜色
+        color1, color2 = get_color_scheme_colors(color_scheme, is_dark)
+
         if is_dark:
-            self.setStyleSheet("""
-                #settingsContainer {
+            self.setStyleSheet(f"""
+                #settingsContainer {{
                     background: #1e1e1e;
                     border: 1px solid rgba(102, 126, 234, 0.3);
                     border-radius: 10px;
-                }
-                #settingsContent {
+                }}
+                #settingsContent {{
                     background: #1e1e1e;
                     border-bottom-left-radius: 10px;
                     border-bottom-right-radius: 10px;
-                }
-                #settingTitle {
+                }}
+                #settingTitle {{
                     color: #e0e0e0;
                     font-size: 14px;
                     font-weight: 500;
-                }
-                #settingDesc {
+                }}
+                #settingDesc {{
                     color: #888888;
                     font-size: 12px;
-                }
-                #settingCombo {
+                }}
+                #settingCombo {{
                     background: #2d2d2d;
                     color: #e0e0e0;
                     border: 1px solid #444444;
@@ -457,18 +508,18 @@ class SettingsDialog(QDialog):
                     padding: 6px 10px;
                     padding-right: 25px;
                     font-size: 13px;
-                }
-                #settingCombo:hover {
+                }}
+                #settingCombo:hover {{
                     border-color: #5a6678;
-                }
-                #settingCombo::drop-down {
+                }}
+                #settingCombo::drop-down {{
                     border: none;
                     width: 20px;
                     subcontrol-position: right center;
                     subcontrol-origin: padding;
                     right: 5px;
-                }
-                #settingCombo QAbstractItemView {
+                }}
+                #settingCombo QAbstractItemView {{
                     background: #2d2d2d;
                     color: #e0e0e0;
                     border: 1px solid #444444;
@@ -476,71 +527,72 @@ class SettingsDialog(QDialog):
                     padding: 6px;
                     outline: none;
                     selection-background-color: transparent;
-                }
-                #settingCombo QAbstractItemView::item {
+                }}
+                #settingCombo QAbstractItemView::item {{
                     height: 36px;
                     padding: 8px 12px;
                     margin: 3px 4px;
                     border-radius: 6px;
                     background: transparent;
                     color: #e0e0e0;
-                }
-                #settingCombo QAbstractItemView::item:hover {
+                }}
+                #settingCombo QAbstractItemView::item:hover {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(74, 85, 104, 0.4), stop:1 rgba(45, 55, 72, 0.4));
-                }
-                #settingCombo QAbstractItemView::item:selected {
+                        stop:0 rgba(90, 122, 156, 0.4), stop:1 rgba(90, 122, 156, 0.4));
+                }}
+                #settingCombo QAbstractItemView::item:selected {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a5568, stop:1 #2d3748);
+                        stop:0 {color1}, stop:1 {color2});
                     color: white;
-                }
-                #applyBtn, #okBtn {
+                }}
+                #applyBtn, #okBtn {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #4a5568, stop:1 #2d3748);
+                        stop:0 {color1}, stop:1 {color2});
                     color: white;
                     border: none;
                     border-radius: 6px;
                     font-size: 13px;
                     font-weight: 500;
-                }
-                #applyBtn:hover, #okBtn:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #5a6678, stop:1 #3d4758);
-                }
-                #cancelBtn {
+                }}
+                #applyBtn:hover, #okBtn:hover {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {color1}, stop:1 {color2});
+                    opacity: 0.9;
+                }}
+                #cancelBtn {{
                     background: #3d3d3d;
                     color: #e0e0e0;
                     border: 1px solid #555555;
                     border-radius: 6px;
                     font-size: 13px;
-                }
-                #cancelBtn:hover {
+                }}
+                #cancelBtn:hover {{
                     background: #4d4d4d;
                     border-color: #666666;
-                }
+                }}
             """)
         else:
-            self.setStyleSheet("""
-                #settingsContainer {
+            self.setStyleSheet(f"""
+                #settingsContainer {{
                     background: #ffffff;
                     border: 1px solid rgba(102, 126, 234, 0.3);
                     border-radius: 10px;
-                }
-                #settingsContent {
+                }}
+                #settingsContent {{
                     background: #ffffff;
                     border-bottom-left-radius: 10px;
                     border-bottom-right-radius: 10px;
-                }
-                #settingTitle {
+                }}
+                #settingTitle {{
                     color: #303133;
                     font-size: 14px;
                     font-weight: 500;
-                }
-                #settingDesc {
+                }}
+                #settingDesc {{
                     color: #909399;
                     font-size: 12px;
-                }
-                #settingCombo {
+                }}
+                #settingCombo {{
                     background: #f5f7fa;
                     color: #303133;
                     border: 1px solid #dcdfe6;
@@ -548,18 +600,18 @@ class SettingsDialog(QDialog):
                     padding: 6px 10px;
                     padding-right: 25px;
                     font-size: 13px;
-                }
-                #settingCombo:hover {
-                    border-color: #667eea;
-                }
-                #settingCombo::drop-down {
+                }}
+                #settingCombo:hover {{
+                    border-color: {color1};
+                }}
+                #settingCombo::drop-down {{
                     border: none;
                     width: 20px;
                     subcontrol-position: right center;
                     subcontrol-origin: padding;
                     right: 5px;
-                }
-                #settingCombo QAbstractItemView {
+                }}
+                #settingCombo QAbstractItemView {{
                     background: #ffffff;
                     color: #303133;
                     border: 1px solid rgba(102, 126, 234, 0.3);
@@ -567,48 +619,49 @@ class SettingsDialog(QDialog):
                     padding: 6px;
                     outline: none;
                     selection-background-color: transparent;
-                }
-                #settingCombo QAbstractItemView::item {
+                }}
+                #settingCombo QAbstractItemView::item {{
                     height: 36px;
                     padding: 8px 12px;
                     margin: 3px 4px;
                     border-radius: 6px;
                     background: transparent;
                     color: #303133;
-                }
-                #settingCombo QAbstractItemView::item:hover {
+                }}
+                #settingCombo QAbstractItemView::item:hover {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(102, 126, 234, 0.15), stop:1 rgba(118, 75, 162, 0.15));
-                }
-                #settingCombo QAbstractItemView::item:selected {
+                        stop:0 rgba(123, 163, 214, 0.15), stop:1 rgba(123, 163, 214, 0.15));
+                }}
+                #settingCombo QAbstractItemView::item:selected {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #667eea, stop:1 #764ba2);
+                        stop:0 {color1}, stop:1 {color2});
                     color: white;
-                }
-                #applyBtn, #okBtn {
+                }}
+                #applyBtn, #okBtn {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #667eea, stop:1 #764ba2);
+                        stop:0 {color1}, stop:1 {color2});
                     color: white;
                     border: none;
                     border-radius: 6px;
                     font-size: 13px;
                     font-weight: 500;
-                }
-                #applyBtn:hover, #okBtn:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #7b8eef, stop:1 #8b5fb5);
-                }
-                #cancelBtn {
+                }}
+                #applyBtn:hover, #okBtn:hover {{
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                        stop:0 {color1}, stop:1 {color2});
+                    opacity: 0.9;
+                }}
+                #cancelBtn {{
                     background: #f5f7fa;
                     color: #606266;
                     border: 1px solid #dcdfe6;
                     border-radius: 6px;
                     font-size: 13px;
-                }
-                #cancelBtn:hover {
+                }}
+                #cancelBtn:hover {{
                     background: #e8edf5;
                     border-color: #c0c4cc;
-                }
+                }}
             """)
 
 
@@ -630,7 +683,7 @@ class ClipboardWindow(QWidget):
         self.settings_file = Path(__file__).parent / 'data' / 'settings.json'
 
         # 设置
-        self.settings = {'output_mode': 'comma', 'theme': 'light'}
+        self.settings = {'output_mode': 'comma', 'theme': 'light', 'color_scheme': 'pure_blue'}
         self.load_settings()
 
         # 拖拽相关
@@ -665,7 +718,7 @@ class ClipboardWindow(QWidget):
         self.init_tray_icon()
 
         # 应用保存的主题
-        self.apply_theme(self.settings.get('theme', 'light'))
+        self.apply_theme(self.settings.get('theme', 'light'), self.settings.get('color_scheme', 'pure_blue'))
 
         # 更新模式标识
         self.update_mode_label()
@@ -975,6 +1028,7 @@ class ClipboardWindow(QWidget):
             def __init__(self, parent=None):
                 super().__init__(parent)
                 self.is_dark = False
+                self.color_scheme = 'pure_blue'
 
             def paintEvent(self, event):
                 painter = QPainter(self)
@@ -994,18 +1048,19 @@ class ClipboardWindow(QWidget):
                 path.lineTo(rect.left(), rect.bottom())
 
                 gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
-                if self.is_dark:
-                    # 暗夜模式：更深的渐变色
-                    gradient.setColorAt(0, QColor('#4a5568'))
-                    gradient.setColorAt(1, QColor('#2d3748'))
-                else:
-                    # 日间模式：原有的渐变色
-                    gradient.setColorAt(0, QColor('#667eea'))
-                    gradient.setColorAt(1, QColor('#764ba2'))
+
+                # 获取配色方案的颜色
+                color1, color2 = get_color_scheme_colors(self.color_scheme, self.is_dark)
+                gradient.setColorAt(0, QColor(color1))
+                gradient.setColorAt(1, QColor(color2))
                 painter.fillPath(path, gradient)
 
             def setDarkMode(self, is_dark):
                 self.is_dark = is_dark
+                self.update()
+
+            def setColorScheme(self, scheme):
+                self.color_scheme = scheme
                 self.update()
 
         header = HeaderWidget()
@@ -1387,7 +1442,66 @@ class ClipboardWindow(QWidget):
         layout.addWidget(delete_btn)
 
         widget.setLayout(layout)
+
+        # 添加鼠标单击事件，用于直接粘贴该项
+        # 使用partial捕获widget和text，避免lambda闭包问题
+        widget.mousePressEvent = partial(self.on_item_click, widget=widget, text=text)
+        widget.setCursor(Qt.PointingHandCursor)  # 设置鼠标指针为手型
+
         return widget
+
+    def on_item_click(self, event, widget, text):
+        """处理列表项的鼠标点击事件"""
+        # 只处理左键单击
+        if event.button() != Qt.LeftButton:
+            return
+
+        # 检查点击的是否是删除按钮区域（右侧30像素）
+        if event.pos().x() > widget.width() - 30:
+            # 点击的是删除按钮区域，不进行粘贴
+            return
+
+        # 执行单项粘贴
+        self.paste_single_item(text)
+
+    def paste_single_item(self, text):
+        """粘贴单个项目到光标位置"""
+        if not text:
+            return
+
+        try:
+            # 记录粘贴的内容和时间
+            self.last_pasted_text = text
+            self.last_paste_time = time.time()
+            self.paste_ignore_until = time.time() + 1.5
+
+            # 设置剪贴板
+            if set_clipboard_text(text):
+                self.last_clipboard_text = text
+                # 延迟250ms执行粘贴
+                QTimer.singleShot(250, self._execute_single_paste)
+        except Exception as e:
+            print(f"单项粘贴失败: {e}")
+
+    def _execute_single_paste(self):
+        """执行单项粘贴操作"""
+        try:
+            # 先释放所有修饰键（Ctrl、Alt、Shift）
+            send_input_key(VK_CONTROL, up=True)
+            send_input_key(VK_MENU, up=True)
+            send_input_key(VK_SHIFT, up=True)
+            time.sleep(0.05)
+
+            # 模拟 Ctrl+V
+            send_input_key(VK_CONTROL, up=False)
+            time.sleep(0.02)
+            send_input_key(VK_V, up=False)
+            time.sleep(0.02)
+            send_input_key(VK_V, up=True)
+            time.sleep(0.02)
+            send_input_key(VK_CONTROL, up=True)
+        except Exception as e:
+            print(f"执行单项粘贴失败: {e}")
 
     def remove_item_by_text(self, text):
         """删除指定项"""
@@ -1492,6 +1606,7 @@ class ClipboardWindow(QWidget):
         """应用设置"""
         old_theme = self.settings.get('theme')
         old_output_mode = self.settings.get('output_mode')
+        old_color_scheme = self.settings.get('color_scheme')
         self.settings.update(new_settings)
         self.save_settings()
 
@@ -1500,21 +1615,22 @@ class ClipboardWindow(QWidget):
             self.sequential_index = -1  # 重置索引，下次使用时会初始化到正确位置
             self.update_mode_label()  # 更新模式标识
 
-        # 如果主题改变，应用新主题
-        if new_settings.get('theme') != old_theme:
-            self.apply_theme(new_settings.get('theme'))
+        # 如果主题或配色方案改变，应用新样式
+        if new_settings.get('theme') != old_theme or new_settings.get('color_scheme') != old_color_scheme:
+            self.apply_theme(new_settings.get('theme'), new_settings.get('color_scheme', 'pure_blue'))
 
-    def apply_theme(self, theme):
+    def apply_theme(self, theme, color_scheme='pure_blue'):
         """应用主题"""
         is_dark = theme == 'dark'
-        self.update_theme_style(is_dark)
+        self.update_theme_style(is_dark, color_scheme)
         self.update_list()  # 重新渲染列表以应用新主题
 
-    def update_theme_style(self, is_dark=False):
+    def update_theme_style(self, is_dark=False, color_scheme='pure_blue'):
         """更新主题样式"""
-        # 更新标题栏主题
+        # 更新标题栏主题和配色方案
         if hasattr(self, 'header'):
             self.header.setDarkMode(is_dark)
+            self.header.setColorScheme(color_scheme)
 
         if is_dark:
             # 暗夜模式
@@ -1654,7 +1770,42 @@ class ClipboardWindow(QWidget):
         QApplication.quit()
 
 
+def check_single_instance():
+    """检查是否已有实例运行（Windows平台）"""
+    if sys.platform != 'win32':
+        return True
+
+    try:
+        # 使用Windows互斥量确保只有一个实例运行
+        # CreateMutexW: 创建或打开一个命名互斥量
+        kernel32 = ctypes.windll.kernel32
+        mutex_name = "Global\\ClipboardHelperMutex_UniqueID_20231124"
+
+        # 创建互斥量
+        mutex = kernel32.CreateMutexW(None, False, mutex_name)
+        last_error = kernel32.GetLastError()
+
+        # ERROR_ALREADY_EXISTS = 183 表示互斥量已存在（程序已在运行）
+        if last_error == 183:
+            # 显示提示消息
+            MessageBox = ctypes.windll.user32.MessageBoxW
+            MessageBox(None,
+                      "剪贴板助手已经在运行中！\n\n请在系统托盘查看图标，或使用快捷键 Ctrl+Shift+C 显示窗口。",
+                      "提示",
+                      0x40 | 0x0)  # MB_ICONINFORMATION | MB_OK
+            return False
+
+        return True
+    except Exception as e:
+        print(f"单实例检测失败: {e}")
+        return True  # 出错时允许启动
+
+
 def main():
+    # 检查是否已有实例在运行
+    if not check_single_instance():
+        sys.exit(0)
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName('剪贴板助手')

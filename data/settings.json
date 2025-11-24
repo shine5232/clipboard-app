@@ -1,4 +1,5 @@
 {
   "output_mode": "sequential",
-  "theme": "dark"
+  "theme": "light",
+  "color_scheme": "pure_blue"
 }
