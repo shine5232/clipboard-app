@@ -213,19 +213,7 @@ class SettingsDialog(QDialog):
 
         close_btn = QPushButton('×')
         close_btn.setFixedSize(20, 20)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 4px;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: rgba(255, 100, 100, 0.8);
-            }
-        """)
+        close_btn.setStyleSheet(self.theme_manager.get_header_close_button_style())
         close_btn.clicked.connect(self.reject)
         layout.addWidget(close_btn)
 
@@ -365,14 +353,22 @@ class SettingsDialog(QDialog):
             }}
         """
 
+        # 设置标题和描述样式 - 替换 QLabel 为 #settingTitle / #settingDesc
+        setting_title_style = self.theme_manager.get_setting_title_style().replace('QLabel', '#settingTitle')
+        setting_desc_style = self.theme_manager.get_setting_desc_style().replace('QLabel', '#settingDesc')
+
+        # 按钮样式 - 替换 QPushButton 为具体的 ID 选择器
+        primary_btn_style = self.theme_manager.get_primary_button_style().replace('QPushButton', '#applyBtn, #okBtn')
+        secondary_btn_style = self.theme_manager.get_secondary_button_style().replace('QPushButton', '#cancelBtn')
+
         # 组合所有样式
         full_style = (
             container_style +
-            "#settingTitle {" + self.theme_manager.get_setting_title_style() + "}" +
-            "#settingDesc {" + self.theme_manager.get_setting_desc_style() + "}" +
+            setting_title_style +
+            setting_desc_style +
             self.theme_manager.get_combo_box_style() +
-            "#applyBtn, #okBtn {" + self.theme_manager.get_primary_button_style() + "}" +
-            "#cancelBtn {" + self.theme_manager.get_secondary_button_style() + "}"
+            primary_btn_style +
+            secondary_btn_style
         )
 
         self.setStyleSheet(full_style)
@@ -709,26 +705,7 @@ class ClipboardWindow(QWidget):
 
         header = HeaderWidget()
         header.setFixedHeight(50)
-        header.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 5px;
-                color: white;
-                font-size: 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.35);
-            }
-            QLabel {
-                background: transparent;
-                border: none;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-            }
-        """)
+        header.setStyleSheet(self.theme_manager.get_header_button_style() + self.theme_manager.get_header_label_style())
 
         layout = QHBoxLayout()
         layout.setContentsMargins(12, 0, 12, 0)
@@ -741,16 +718,7 @@ class ClipboardWindow(QWidget):
         self.mode_label = QLabel('拼')
         self.mode_label.setFixedSize(20, 20)
         self.mode_label.setAlignment(Qt.AlignCenter)
-        self.mode_label.setStyleSheet("""
-            QLabel {
-                background: rgba(255, 255, 255, 0.25);
-                border: none;
-                border-radius: 4px;
-                color: white;
-                font-size: 12px;
-                font-weight: bold;
-            }
-        """)
+        self.mode_label.setStyleSheet(self.theme_manager.get_header_mode_label_style())
         self.mode_label.setToolTip('当前输出模式')
         layout.addWidget(self.mode_label)
 
@@ -776,16 +744,7 @@ class ClipboardWindow(QWidget):
         painter.end()
 
         clear_btn.setIcon(QIcon(pixmap))
-        clear_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 100, 100, 0.6);
-            }
-        """)
+        clear_btn.setStyleSheet(self.theme_manager.get_header_clear_button_style())
         layout.addWidget(clear_btn)
 
         # 设置按钮（齿轮图标）
@@ -819,35 +778,14 @@ class ClipboardWindow(QWidget):
         gear_painter.end()
 
         settings_btn.setIcon(QIcon(gear_pixmap))
-        settings_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.35);
-            }
-        """)
+        settings_btn.setStyleSheet(self.theme_manager.get_header_icon_button_style())
         settings_btn.clicked.connect(self.show_settings)
         layout.addWidget(settings_btn)
 
         close_btn = QPushButton('×')
         close_btn.setFixedSize(20, 20)
         close_btn.setToolTip('隐藏窗口')
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                border-radius: 4px;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: rgba(255, 100, 100, 0.8);
-            }
-        """)
+        close_btn.setStyleSheet(self.theme_manager.get_header_close_button_style())
         close_btn.clicked.connect(self.hide_window)
         layout.addWidget(close_btn)
 

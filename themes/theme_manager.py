@@ -466,6 +466,89 @@ class ThemeManager:
                 }
             """
 
+    def get_header_button_style(self):
+        """获取头部按钮样式（透明背景）"""
+        return """
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 5px;
+                color: white;
+                font-size: 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.35);
+            }
+        """
+
+    def get_header_close_button_style(self):
+        """获取头部关闭按钮样式"""
+        return """
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 4px;
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: rgba(255, 100, 100, 0.8);
+            }
+        """
+
+    def get_header_icon_button_style(self):
+        """获取头部图标按钮样式（用于设置、清空等）"""
+        return """
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.35);
+            }
+        """
+
+    def get_header_mode_label_style(self):
+        """获取模式标识标签样式"""
+        return """
+            QLabel {
+                background: rgba(255, 255, 255, 0.25);
+                border: none;
+                border-radius: 4px;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+            }
+        """
+
+    def get_header_clear_button_style(self):
+        """获取清空按钮样式"""
+        return """
+            QPushButton {
+                background: rgba(255, 255, 255, 0.2);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 100, 100, 0.6);
+            }
+        """
+
+    def get_header_label_style(self):
+        """获取头部标签样式"""
+        return """
+            QLabel {
+                background: transparent;
+                border: none;
+                color: white;
+                font-size: 14px;
+                font-weight: 600;
+            }
+        """
+
 
 # 向后兼容的全局函数
 def get_color_scheme_colors(scheme, is_dark=False):
