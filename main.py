@@ -36,6 +36,7 @@ from themes.theme_manager import ThemeManager, get_color_scheme_colors
 
 # 导入UI组件
 from ui.components.clickable_label import ClickableLabel
+from ui.components.floating_icon import FloatingIcon
 
 
 class SettingsDialog(QDialog):
@@ -413,6 +414,10 @@ class ClipboardWindow(QWidget):
         self.paste_ignore_until = 0  # 时间戳，在此之前忽略剪贴板变化
         self.sequential_index = -1  # 顺序输出模式的当前索引（从最后一项开始）
         self.previous_window = None  # 记录前一个活动窗口
+
+        # 胶囊模式
+        self.is_capsule_mode = False  # 是否处于胶囊模式
+        self.floating_icon = None  # 浮动图标组件
 
         # 初始化UI
         self.init_ui()
@@ -793,9 +798,16 @@ class ClipboardWindow(QWidget):
         header.mousePressEvent = self.header_mouse_press
         header.mouseMoveEvent = self.header_mouse_move
         header.mouseReleaseEvent = self.header_mouse_release
+        header.mouseDoubleClickEvent = self.header_double_click
 
         self.header = header
         return header
+
+    def header_double_click(self, event):
+        """双击标题栏切换胶囊模式"""
+        if event.button() == Qt.LeftButton:
+            self.toggle_capsule_mode()
+            event.accept()
 
     def create_shadow(self):
         """创建阴影效果"""
@@ -890,6 +902,9 @@ class ClipboardWindow(QWidget):
         """更新列表显示"""
         self.list_widget.clear()
         self.title_label.setText(f'剪贴板 ({len(self.clipboard_data)})')
+
+        # 更新胶囊数量
+        self.update_capsule_count()
 
         is_dark = self.settings.get('theme') == 'dark'
 
@@ -1036,6 +1051,12 @@ class ClipboardWindow(QWidget):
         self.show_notification('程序已最小化到系统托盘')
 
     def show_window(self):
+        """显示主窗口"""
+        # 如果处于胶囊模式，先退出胶囊模式
+        if self.is_capsule_mode:
+            self.restore_from_capsule()
+            return
+
         # 记录当前活动窗口（在显示剪贴板窗口之前）
         self.previous_window = get_foreground_window()
 
@@ -1044,7 +1065,11 @@ class ClipboardWindow(QWidget):
         self.raise_()
 
     def do_toggle_window(self):
-        if self.isVisible():
+        """切换窗口显示状态"""
+        # 如果处于胶囊模式，恢复主窗口
+        if self.is_capsule_mode:
+            self.restore_from_capsule()
+        elif self.isVisible():
             self.hide_window()
         else:
             self.show_window()
@@ -1101,6 +1126,132 @@ class ClipboardWindow(QWidget):
         dialog = SettingsDialog(self, self.settings.copy())
         dialog.exec_()
 
+    def init_capsule_widget(self):
+        """初始化浮动图标"""
+        if self.floating_icon is None:
+            self.floating_icon = FloatingIcon()
+            # 设置主题
+            is_dark = self.settings.get('theme') == 'dark'
+            color_scheme = self.settings.get('color_scheme', 'pure_blue')
+            self.floating_icon.set_theme(is_dark, color_scheme)
+            # 设置数量
+            self.floating_icon.set_count(len(self.clipboard_data))
+            # 连接信号
+            self.floating_icon.double_clicked.connect(self.restore_from_capsule)
+
+    def toggle_capsule_mode(self):
+        """切换胶囊模式"""
+        if self.is_capsule_mode:
+            # 从胶囊模式恢复
+            self.restore_from_capsule()
+        else:
+            # 进入胶囊模式
+            self.enter_capsule_mode()
+
+    def enter_capsule_mode(self):
+        """进入胶囊模式"""
+        if self.is_capsule_mode:
+            return
+
+        self.is_capsule_mode = True
+
+        # 初始化浮动图标
+        self.init_capsule_widget()
+
+        # 获取主窗口标题栏位置作为动画起点
+        start_pos = self.pos()
+        # 标题栏中心位置（标题栏高度约50px）
+        start_x = start_pos.x() + self.width() // 2
+        start_y = start_pos.y() + 25  # 标题栏中心位置
+
+        # 隐藏主窗口
+        self.hide()
+
+        # 计算目标位置（屏幕右侧胶囊位置）
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import QRect, QPropertyAnimation, QEasingCurve, QTimer
+        screen = QApplication.desktop().screenGeometry()
+
+        capsule_x = screen.width() - self.floating_icon.capsule_width
+        capsule_y = (screen.height() - self.floating_icon.capsule_height) // 2
+
+        # 先设置为小圆形（使用较小的尺寸），从标题栏位置开始
+        small_size = 40  # 小圆形大小
+        self.floating_icon.is_capsule_mode = False
+        self.floating_icon.setGeometry(start_x - small_size // 2,
+                                       start_y - small_size // 2,
+                                       small_size,
+                                       small_size)
+        self.floating_icon.show()
+
+        # 第一阶段：小圆形飞到右侧并放大到正常圆形大小
+        fly_animation = QPropertyAnimation(self.floating_icon, b"geometry")
+        fly_animation.setDuration(600)  # 600ms飞行动画
+        fly_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+        # 飞行目标：屏幕右侧边缘位置（贴边），放大到正常圆形大小
+        # 让圆形直接飞到右边缘，圆形的右边缘贴着屏幕边缘
+        fly_target_x = screen.width() - self.floating_icon.icon_size
+        fly_target_y = (screen.height() - self.floating_icon.icon_size) // 2
+
+        fly_animation.setStartValue(QRect(start_x - small_size // 2,
+                                          start_y - small_size // 2,
+                                          small_size,
+                                          small_size))
+        fly_animation.setEndValue(QRect(fly_target_x, fly_target_y,
+                                        self.floating_icon.icon_size,
+                                        self.floating_icon.icon_size))
+
+        # 飞行完成后，延迟变形为胶囊
+        def on_fly_finished():
+            # 300ms后变形为胶囊
+            QTimer.singleShot(300, lambda: self.floating_icon.morph_to_capsule() if self.floating_icon else None)
+
+        fly_animation.finished.connect(on_fly_finished)
+        fly_animation.start()
+
+        # 保存动画引用，避免被垃圾回收
+        self.floating_icon._fly_animation = fly_animation
+
+    def restore_from_capsule(self):
+        """从胶囊模式恢复"""
+        if not self.is_capsule_mode:
+            return
+
+        self.is_capsule_mode = False
+
+        # 获取浮动图标当前位置，将主窗口移动到该位置附近
+        if self.floating_icon:
+            icon_pos = self.floating_icon.pos()
+            # 计算主窗口位置：让主窗口的右上角对齐图标位置
+            # 向左偏移主窗口宽度，向上稍微偏移
+            new_x = icon_pos.x() - self.width() + self.floating_icon.width()
+            new_y = icon_pos.y() - 50  # 向上偏移50px，避免被图标遮挡
+
+            # 确保窗口不超出屏幕边界
+            from PyQt5.QtWidgets import QApplication
+            screen = QApplication.desktop().screenGeometry()
+
+            # 限制在屏幕范围内
+            new_x = max(0, min(new_x, screen.width() - self.width()))
+            new_y = max(0, min(new_y, screen.height() - self.height()))
+
+            self.move(new_x, new_y)
+
+            # 隐藏浮动图标
+            self.floating_icon.hide()
+
+        # 显示主窗口
+        self.show()
+        self.activateWindow()
+        self.raise_()
+
+    def update_capsule_count(self):
+        """更新浮动图标显示的数量"""
+        if self.floating_icon:
+            self.floating_icon.set_count(len(self.clipboard_data))
+
+
     def apply_settings(self, new_settings):
         """应用设置"""
         old_theme = self.settings.get('theme')
@@ -1123,6 +1274,10 @@ class ClipboardWindow(QWidget):
         is_dark = theme == 'dark'
         self.update_theme_style(is_dark, color_scheme)
         self.update_list()  # 重新渲染列表以应用新主题
+
+        # 更新浮动图标主题
+        if self.floating_icon:
+            self.floating_icon.set_theme(is_dark, color_scheme)
 
     def update_theme_style(self, is_dark=False, color_scheme='pure_blue'):
         """更新主题样式"""

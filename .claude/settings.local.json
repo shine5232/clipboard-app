@@ -14,7 +14,11 @@
       "Bash(timeout:*)",
       "Bash(\"C:\\Users\\LZ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" \"C:\\Users\\LZ\\Documents\\clipboard-app\\main.py\")",
       "Bash(copy main.py main.py.backup)",
-      "Bash(\"C:\\Users\\LZ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" \"E:\\clipboard-app\\main.py\")"
+      "Bash(\"C:\\Users\\LZ\\AppData\\Local\\Programs\\Python\\Python314\\python.exe\" \"E:\\clipboard-app\\main.py\")",
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"Stop-Process -Name python -Force\")"
     ],
     "deny": [],
     "ask": []
