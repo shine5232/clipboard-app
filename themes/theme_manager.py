@@ -20,6 +20,10 @@ class ThemeManager:
         'pure_green': {
             'light': ('#7fb896', '#7fb896'),
             'dark': ('#5a8c6e', '#5a8c6e')
+        },
+        'sakura_pink': {
+            'light': ('#ff6b9d', '#ff6b9d'),
+            'dark': ('#d5578a', '#d5578a')
         }
     }
 
@@ -156,11 +160,39 @@ class ThemeManager:
             }
         """
 
-    def get_primary_button_style(self):
-        """获取主要按钮样式"""
+    def get_primary_button_style(self, selector='QPushButton'):
+        """
+        获取主要按钮样式
+
+        Args:
+            selector: CSS选择器，默认为 'QPushButton'，可以传入如 '#applyBtn, #okBtn'
+        """
         color1, color2 = self.get_colors()
+
+        # 计算悬停和按下时的深色
+        from PyQt5.QtGui import QColor
+        c1 = QColor(color1)
+        c2 = QColor(color2)
+
+        # 悬停时稍微变亮
+        hover_c1 = c1.lighter(115).name()
+        hover_c2 = c2.lighter(115).name()
+
+        # 按下时稍微变暗
+        press_c1 = c1.darker(110).name()
+        press_c2 = c2.darker(110).name()
+
+        # 处理多选择器的情况，为每个选择器添加伪类
+        def add_pseudo_class(selectors, pseudo):
+            """为每个选择器添加伪类"""
+            parts = [s.strip() for s in selectors.split(',')]
+            return ', '.join([f'{s}{pseudo}' for s in parts])
+
+        hover_selector = add_pseudo_class(selector, ':hover')
+        pressed_selector = add_pseudo_class(selector, ':pressed')
+
         return f"""
-            QPushButton {{
+            {selector} {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 {color1}, stop:1 {color2});
                 color: white;
@@ -169,42 +201,67 @@ class ThemeManager:
                 font-size: 13px;
                 font-weight: 500;
             }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 {color1}, stop:1 {color2});
-                opacity: 0.9;
+            {hover_selector} {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {hover_c1}, stop:1 {hover_c2});
+            }}
+            {pressed_selector} {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {press_c1}, stop:1 {press_c2});
             }}
         """
 
-    def get_secondary_button_style(self):
-        """获取次要按钮样式"""
+    def get_secondary_button_style(self, selector='QPushButton'):
+        """
+        获取次要按钮样式
+
+        Args:
+            selector: CSS选择器，默认为 'QPushButton'，可以传入如 '#cancelBtn'
+        """
+        # 处理多选择器的情况，为每个选择器添加伪类
+        def add_pseudo_class(selectors, pseudo):
+            """为每个选择器添加伪类"""
+            parts = [s.strip() for s in selectors.split(',')]
+            return ', '.join([f'{s}{pseudo}' for s in parts])
+
+        hover_selector = add_pseudo_class(selector, ':hover')
+        pressed_selector = add_pseudo_class(selector, ':pressed')
+
         if self.is_dark:
-            return """
-                QPushButton {
+            return f"""
+                {selector} {{
                     background: #3d3d3d;
                     color: #e0e0e0;
                     border: 1px solid #555555;
                     border-radius: 6px;
                     font-size: 13px;
-                }
-                QPushButton:hover {
+                }}
+                {hover_selector} {{
                     background: #4d4d4d;
                     border-color: #666666;
-                }
+                }}
+                {pressed_selector} {{
+                    background: #2d2d2d;
+                    border-color: #444444;
+                }}
             """
         else:
-            return """
-                QPushButton {
+            return f"""
+                {selector} {{
                     background: #f5f7fa;
                     color: #606266;
                     border: 1px solid #dcdfe6;
                     border-radius: 6px;
                     font-size: 13px;
-                }
-                QPushButton:hover {
+                }}
+                {hover_selector} {{
                     background: #e8edf5;
                     border-color: #c0c4cc;
-                }
+                }}
+                {pressed_selector} {{
+                    background: #d8dde5;
+                    border-color: #a0a4ac;
+                }}
             """
 
     def get_combo_box_style(self):

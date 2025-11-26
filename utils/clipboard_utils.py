@@ -28,11 +28,9 @@ def get_clipboard_text():
             finally:
                 win32clipboard.CloseClipboard()
             return None
-        except Exception as e:
+        except Exception:
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
-            else:
-                print(f"获取剪贴板失败: {e}")
     return None
 
 
@@ -58,11 +56,9 @@ def set_clipboard_text(text):
             finally:
                 win32clipboard.CloseClipboard()
             return True
-        except Exception as e:
+        except Exception:
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
-            else:
-                print(f"设置剪贴板失败: {e}")
     return False
 
 

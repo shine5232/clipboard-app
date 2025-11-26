@@ -20,27 +20,30 @@ if sys.platform == 'win32':
 
 from datetime import datetime
 from pathlib import Path
-from functools import partial
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QListWidget, QLabel, QListWidgetItem,
                              QMessageBox, QMenu, QAction, QSystemTrayIcon,
-                             QDialog, QComboBox, QFormLayout, QFrame)
-from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer
-from PyQt5.QtGui import QIcon, QFont, QBrush, QColor
+                             QDialog, QComboBox, QFormLayout, QFrame, QAbstractItemView)
+from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer, QRect
+from PyQt5.QtGui import QIcon, QFont, QBrush, QColor, QCursor
 
 # 导入工具模块
-from utils.clipboard_utils import get_clipboard_text, set_clipboard_text, process_clipboard_text
-from utils.keyboard_simulator import simulate_paste
-from utils.window_manager import get_foreground_window, set_foreground_window
-from utils.data_manager import ClipboardDataManager
+from utils.clipboard_utils import get_clipboard_text
+from utils.clipboard_listener import ClipboardListener
+
+# 导入业务逻辑层
+from services.clipboard_service import ClipboardService
+
+# 导入数据模型层
+from models.data_model import DataModel
 
 # 导入主题模块
 from themes.theme_manager import ThemeManager, get_color_scheme_colors
 
 # 导入UI组件
-from ui.components.clickable_label import ClickableLabel
 from ui.components.floating_icon import FloatingIcon
 from ui.components.tray_menu import TrayMenu
+from ui.components.clipboard_delegate import ClipboardItemDelegate
 
 
 class SettingsDialog(QDialog):
@@ -118,8 +121,8 @@ class SettingsDialog(QDialog):
         color_scheme_group = self.create_setting_row(
             '配色方案',
             '选择界面的配色风格',
-            ['蓝渐变', '纯蓝色', '纯绿色'],
-            {'blue_gradient': 0, 'pure_blue': 1, 'pure_green': 2}.get(self.settings.get('color_scheme', 'pure_blue'), 0),
+            ['魅力蓝', '天空蓝', '青草绿', '樱花粉'],
+            {'blue_gradient': 0, 'pure_blue': 1, 'pure_green': 2, 'sakura_pink': 3}.get(self.settings.get('color_scheme', 'pure_blue'), 1),
             'color_scheme'
         )
         content_layout.addWidget(color_scheme_group)
@@ -309,7 +312,7 @@ class SettingsDialog(QDialog):
         elif key == 'theme':
             self.temp_settings['theme'] = 'light' if index == 0 else 'dark'
         elif key == 'color_scheme':
-            scheme_map = {0: 'blue_gradient', 1: 'pure_blue', 2: 'pure_green'}
+            scheme_map = {0: 'blue_gradient', 1: 'pure_blue', 2: 'pure_green', 3: 'sakura_pink'}
             self.temp_settings['color_scheme'] = scheme_map.get(index, 'pure_blue')
 
     def apply_settings(self):
@@ -362,9 +365,9 @@ class SettingsDialog(QDialog):
         setting_title_style = self.theme_manager.get_setting_title_style().replace('QLabel', '#settingTitle')
         setting_desc_style = self.theme_manager.get_setting_desc_style().replace('QLabel', '#settingDesc')
 
-        # 按钮样式 - 替换 QPushButton 为具体的 ID 选择器
-        primary_btn_style = self.theme_manager.get_primary_button_style().replace('QPushButton', '#applyBtn, #okBtn')
-        secondary_btn_style = self.theme_manager.get_secondary_button_style().replace('QPushButton', '#cancelBtn')
+        # 按钮样式 - 使用参数化选择器
+        primary_btn_style = self.theme_manager.get_primary_button_style('#applyBtn, #okBtn')
+        secondary_btn_style = self.theme_manager.get_secondary_button_style('#cancelBtn')
 
         # 组合所有样式
         full_style = (
@@ -390,17 +393,17 @@ class ClipboardWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        # 数据管理器
-        self.data_manager = ClipboardDataManager()
+        # 初始化数据模型层
+        self.data_model = DataModel()
 
-        # 数据存储
-        self.clipboard_data = []
-        self.data_file = Path(__file__).parent / 'data' / 'clipboard_data.json'
-        self.settings_file = Path(__file__).parent / 'data' / 'settings.json'
+        # 初始化业务逻辑层
+        self.clipboard_service = ClipboardService()
 
         # 设置
-        self.settings = {'output_mode': 'comma', 'theme': 'light', 'color_scheme': 'pure_blue'}
-        self.load_settings()
+        self.settings = self.data_model.load_settings()
+
+        # 同步业务层设置
+        self.clipboard_service.set_output_mode(self.settings.get('output_mode', 'comma'))
 
         # 主题管理器
         self.theme_manager = ThemeManager(
@@ -412,13 +415,6 @@ class ClipboardWindow(QWidget):
         self.dragging = False
         self.drag_position = QPoint()
 
-        # 状态管理
-        self.last_pasted_text = ""
-        self.last_paste_time = 0  # 最后一次粘贴的时间戳
-        self.paste_ignore_until = 0  # 时间戳，在此之前忽略剪贴板变化
-        self.sequential_index = -1  # 顺序输出模式的当前索引（从最后一项开始）
-        self.previous_window = None  # 记录前一个活动窗口
-
         # 胶囊模式
         self.is_capsule_mode = False  # 是否处于胶囊模式
         self.floating_icon = None  # 浮动图标组件
@@ -429,7 +425,11 @@ class ClipboardWindow(QWidget):
         # 加载数据
         self.load_data()
 
-        # 连接信号
+        # 连接业务层信号
+        self.clipboard_service.data_changed.connect(self.on_service_data_changed)
+        self.clipboard_service.notification_requested.connect(self.show_notification)
+
+        # 连接UI信号
         self.clipboard_changed_signal.connect(self.on_clipboard_changed)
         self.toggle_window_signal.connect(self.do_toggle_window)
         self.quit_app_signal.connect(self.do_quit_app)
@@ -452,67 +452,87 @@ class ClipboardWindow(QWidget):
 
     def register_clipboard_listener(self):
         """注册 Windows 剪贴板监听器"""
-        # 使用定时器轮询剪贴板（最可靠的方式）
-        self.last_clipboard_text = get_clipboard_text() or ""
-        # 不指定父对象，确保定时器独立于窗口可见性运行
-        self.clipboard_check_timer = QTimer()
-        self.clipboard_check_timer.timeout.connect(self.check_clipboard_change)
-        self.clipboard_check_timer.start(300)  # 每300ms检查一次
+        self.clipboard_service.last_clipboard_text = get_clipboard_text() or ""
 
-    def check_clipboard_change(self):
-        """检查剪贴板是否变化"""
+        # 使用 Windows API 监听剪贴板变化
+        self.clipboard_listener = ClipboardListener()
+        self.clipboard_listener.clipboard_changed.connect(self.on_clipboard_update)
+
+        if self.clipboard_listener.start():
+            pass  # 剪贴板监听器已启动（使用 Windows API）
+        else:
+            # 如果 API 监听失败，回退到轮询方式
+            self.clipboard_check_timer = QTimer()
+            self.clipboard_check_timer.timeout.connect(self.check_clipboard_change)
+            self.clipboard_check_timer.start(300)
+
+    def on_clipboard_update(self):
+        """Windows API 触发的剪贴板更新事件"""
         current_time = time.time()
 
         # 如果在忽略时间内，跳过
-        if current_time < self.paste_ignore_until:
+        if current_time < self.clipboard_service.paste_ignore_until:
+            return
+
+        try:
+            # 延迟一小段时间再读取，确保剪贴板数据已就绪
+            QTimer.singleShot(50, self._process_clipboard_update)
+        except Exception:
+            pass  # 处理剪贴板更新失败
+
+    def _process_clipboard_update(self):
+        """处理剪贴板更新"""
+        try:
+            current_text = get_clipboard_text()
+            if current_text:
+                # 检查是否与上次相同
+                if current_text != self.clipboard_service.last_clipboard_text:
+                    if not self.clipboard_service.should_ignore_clipboard_change(current_text):
+                        self.clipboard_service.last_clipboard_text = current_text
+                        self.clipboard_changed_signal.emit()
+                    else:
+                        self.clipboard_service.last_clipboard_text = current_text
+        except Exception:
+            pass  # 读取剪贴板失败
+
+    def check_clipboard_change(self):
+        """检查剪贴板是否变化（轮询方式备用）"""
+        current_time = time.time()
+
+        # 如果在忽略时间内，跳过
+        if current_time < self.clipboard_service.paste_ignore_until:
             return
 
         try:
             current_text = get_clipboard_text()
-            if current_text and current_text != self.last_clipboard_text:
-                # 检查是否是我们刚粘贴的内容（带时间窗口检查）
-                if current_text == self.last_pasted_text and current_time < self.last_paste_time + 3.0:
-                    self.last_clipboard_text = current_text
-                    return
-
-                self.last_clipboard_text = current_text
-                self.clipboard_changed_signal.emit()
-        except Exception as e:
-            print(f"检查剪贴板失败: {e}")
+            if current_text:
+                # 检查是否与上次相同
+                if current_text != self.clipboard_service.last_clipboard_text:
+                    if not self.clipboard_service.should_ignore_clipboard_change(current_text):
+                        self.clipboard_service.last_clipboard_text = current_text
+                        self.clipboard_changed_signal.emit()
+                    else:
+                        self.clipboard_service.last_clipboard_text = current_text
+        except Exception:
+            pass  # 检查剪贴板失败
 
     def on_clipboard_changed(self):
         """处理剪贴板变化"""
-        text = self.last_clipboard_text
+        text = self.clipboard_service.last_clipboard_text
         if not text:
             return
 
         try:
-            # 处理文本（使用导入的函数）
-            texts = process_clipboard_text(text)
-
-            # 添加数据
-            added_count = 0
-            for text_item in texts:
-                if not any(item['text'] == text_item for item in self.clipboard_data):
-                    self.clipboard_data.append({
-                        'text': text_item,
-                        'timestamp': datetime.now().strftime('%H:%M:%S')
-                    })
-                    added_count += 1
+            # 使用服务层处理剪贴板变化
+            added_count = self.clipboard_service.handle_clipboard_change(
+                text,
+                is_window_visible=self.isVisible()
+            )
 
             if added_count > 0:
-                self.sequential_index = -1  # 重置顺序输出索引
-                self.update_list()
                 self.save_data()
-
-                # 只在窗口隐藏时显示通知
-                if not self.isVisible():
-                    if added_count == 1:
-                        self.show_notification(f'已复制: {texts[0][:20]}...' if len(texts[0]) > 20 else f'已复制: {texts[0]}')
-                    else:
-                        self.show_notification(f'已添加 {added_count} 项')
-        except Exception as e:
-            print(f"处理剪贴板变化失败: {e}")
+        except Exception:
+            pass  # 处理剪贴板变化失败
 
     def register_hotkeys(self):
         """注册全局快捷键"""
@@ -535,90 +555,25 @@ class ClipboardWindow(QWidget):
                 '<ctrl>+<shift>+q': on_quit_hotkey
             })
             self.hotkey_listener.start()
-        except Exception as e:
-            print(f"快捷键注册失败: {e}")
+        except Exception:
+            pass  # 快捷键注册失败
 
     def do_paste(self):
         """执行批量粘贴：自动粘贴到当前位置"""
-        if not self.clipboard_data:
-            return
+        # 使用服务层准备粘贴内容
+        text_to_paste, success = self.clipboard_service.prepare_paste_content()
 
-        output_mode = self.settings.get('output_mode', 'comma')
+        if success and text_to_paste:
+            # 延迟250ms执行粘贴
+            QTimer.singleShot(250, self._execute_paste)
 
-        if output_mode == 'sequential':
-            # 顺序输出模式：先进先出（FIFO），从第一项开始
-            # 初始化或重置索引（从第一项开始）
-            if self.sequential_index < 0 or self.sequential_index >= len(self.clipboard_data):
-                self.sequential_index = 0
-
-            current_item = self.clipboard_data[self.sequential_index]
-            text_to_paste = current_item['text'] if isinstance(current_item, dict) else current_item
-
-            # 记录粘贴的内容和时间
-            self.last_pasted_text = text_to_paste
-            self.last_paste_time = time.time()
-            self.paste_ignore_until = time.time() + 1.5
-
-            # 设置剪贴板
-            if set_clipboard_text(text_to_paste):
-                self.last_clipboard_text = text_to_paste
-                # 延迟250ms执行粘贴
-                QTimer.singleShot(250, lambda: self._execute_paste(mode='sequential'))
-
-        elif output_mode == 'reverse':
-            # 倒序输出模式：后入先出（LIFO），从最后一项开始
-            # 初始化或重置索引（从最后一项开始）
-            if self.sequential_index < 0 or self.sequential_index >= len(self.clipboard_data):
-                self.sequential_index = len(self.clipboard_data) - 1
-
-            current_item = self.clipboard_data[self.sequential_index]
-            text_to_paste = current_item['text'] if isinstance(current_item, dict) else current_item
-
-            # 记录粘贴的内容和时间
-            self.last_pasted_text = text_to_paste
-            self.last_paste_time = time.time()
-            self.paste_ignore_until = time.time() + 1.5
-
-            # 设置剪贴板
-            if set_clipboard_text(text_to_paste):
-                self.last_clipboard_text = text_to_paste
-                # 延迟250ms执行粘贴
-                QTimer.singleShot(250, lambda: self._execute_paste(mode='reverse'))
-
-        else:
-            # 逗号拼接模式：拼接所有文本
-            texts = [item['text'] if isinstance(item, dict) else item for item in self.clipboard_data]
-            combined_text = ','.join(texts)
-
-            # 记录粘贴的内容和时间
-            self.last_pasted_text = combined_text
-            self.last_paste_time = time.time()
-            self.paste_ignore_until = time.time() + 1.5
-
-            # 设置剪贴板
-            if set_clipboard_text(combined_text):
-                self.last_clipboard_text = combined_text
-                # 延迟250ms执行粘贴
-                QTimer.singleShot(250, lambda: self._execute_paste(mode='comma'))
-
-    def _execute_paste(self, mode='comma'):
+    def _execute_paste(self):
         """执行实际的粘贴操作"""
-        # 模拟粘贴
-        simulate_paste()
+        # 执行粘贴
+        self.clipboard_service.execute_paste()
 
-        # 根据模式移动索引
-        if mode == 'sequential':
-            # 顺序输出：向后移动
-            self.sequential_index += 1
-            # 如果到达末尾，循环回到开头
-            if self.sequential_index >= len(self.clipboard_data):
-                self.sequential_index = 0
-        elif mode == 'reverse':
-            # 倒序输出：向前移动
-            self.sequential_index -= 1
-            # 如果到达开头，循环回到最后
-            if self.sequential_index < 0:
-                self.sequential_index = len(self.clipboard_data) - 1
+        # 更新索引
+        self.clipboard_service.update_sequential_index()
 
     def show_notification(self, message):
         """显示系统通知"""
@@ -659,6 +614,22 @@ class ClipboardWindow(QWidget):
         self.list_widget.setSpacing(4)
         # 使用主题管理器设置列表样式
         self.list_widget.setStyleSheet(self.theme_manager.get_list_widget_style())
+
+        # 设置虚拟化列表委托
+        self.item_delegate = ClipboardItemDelegate(self.list_widget, self.theme_manager)
+        self.item_delegate.set_theme(self.theme_manager.is_dark)
+        self.item_delegate.on_item_click = self.paste_single_item
+        self.item_delegate.on_delete_click = self.remove_item_by_text
+        self.list_widget.setItemDelegate(self.item_delegate)
+
+        # 启用鼠标追踪以支持悬停效果
+        self.list_widget.setMouseTracking(True)
+        self.list_widget.viewport().setMouseTracking(True)
+        self.list_widget.viewport().installEventFilter(self)
+
+        # 设置统一项目高度以优化性能
+        self.list_widget.setUniformItemSizes(True)
+
         container_layout.addWidget(self.list_widget)
 
         self.main_container.setLayout(container_layout)
@@ -901,17 +872,28 @@ class ClipboardWindow(QWidget):
             self.mode_label.setText(mode_text)
             self.mode_label.setToolTip(f'当前输出模式：{mode_tooltip}')
 
+    def on_service_data_changed(self):
+        """业务层数据变化时的回调"""
+        self.update_list()
+
     def update_list(self):
-        """更新列表显示"""
+        """更新列表显示 - 使用虚拟化渲染"""
         self.list_widget.clear()
-        self.title_label.setText(f'剪贴板 ({len(self.clipboard_data)})')
+
+        # 从服务层获取数据
+        clipboard_data = self.clipboard_service.get_all_data()
+        self.title_label.setText(f'剪贴板 ({len(clipboard_data)})')
 
         # 更新胶囊数量
         self.update_capsule_count()
 
         is_dark = self.settings.get('theme') == 'dark'
 
-        if not self.clipboard_data:
+        # 更新委托主题
+        if hasattr(self, 'item_delegate'):
+            self.item_delegate.set_theme(is_dark)
+
+        if not clipboard_data:
             item = QListWidgetItem('暂无数据')
             item.setFlags(Qt.NoItemFlags)
             item.setTextAlignment(Qt.AlignCenter)
@@ -920,70 +902,77 @@ class ClipboardWindow(QWidget):
             self.list_widget.addItem(item)
             return
 
-        for i, data in enumerate(self.clipboard_data):
-            item_widget = self.create_list_item(i, data)
+        # 使用委托渲染，不创建实际的小部件
+        for i, data in enumerate(clipboard_data):
+            if isinstance(data, str):
+                item_data = {
+                    'text': data,
+                    'timestamp': datetime.now().strftime('%H:%M:%S')
+                }
+            else:
+                item_data = {
+                    'text': data['text'],
+                    'timestamp': data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
+                }
+
             item = QListWidgetItem()
-            item.setSizeHint(item_widget.sizeHint())
+            item.setData(Qt.UserRole, item_data)
+            item.setData(Qt.ToolTipRole, item_data['text'])  # 设置提示文本
+            item.setSizeHint(self.item_delegate.sizeHint(None, None))
             self.list_widget.addItem(item)
-            self.list_widget.setItemWidget(item, item_widget)
 
-    def create_list_item(self, index, data):
-        """创建列表项"""
-        if isinstance(data, str):
-            text = data
-            timestamp = datetime.now().strftime('%H:%M:%S')
-        else:
-            text = data['text']
-            timestamp = data.get('timestamp', datetime.now().strftime('%H:%M:%S'))
+    def eventFilter(self, obj, event):
+        """事件过滤器 - 处理列表项悬停效果"""
+        from PyQt5.QtCore import QEvent
 
-        widget = QWidget()
-        widget.setMinimumHeight(40)
+        if obj == self.list_widget.viewport():
+            if event.type() == QEvent.MouseMove:
+                # 获取鼠标位置对应的索引
+                pos = event.pos()
+                index = self.list_widget.indexAt(pos)
 
-        # 使用主题管理器设置样式
-        widget.setStyleSheet(self.theme_manager.get_list_item_style())
+                if index.isValid():
+                    row = index.row()
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(12)
+                    # 检查是否在删除按钮区域
+                    item = self.list_widget.item(row)
+                    if item:
+                        rect = self.list_widget.visualItemRect(item)
+                        # 计算删除按钮区域
+                        btn_size = 20
+                        margin = 12
+                        btn_x = rect.right() - margin - btn_size - 4  # 4是ITEM_MARGIN
+                        btn_y = rect.y() + (rect.height() - btn_size) // 2
+                        btn_rect = QRect(btn_x, btn_y, btn_size, btn_size)
 
-        # 使用导入的 ClickableLabel 组件
-        label = ClickableLabel(
-            text=text,
-            callback=self.paste_single_item,
-            data=text
-        )
-        label.setWordWrap(False)
-        label.setFixedWidth(200)
-        label.setToolTip(text)
+                        if btn_rect.contains(pos):
+                            self.item_delegate.set_hovered_delete_index(row)
+                            self.setCursor(Qt.PointingHandCursor)
+                        else:
+                            self.item_delegate.set_hovered_delete_index(-1)
+                            self.setCursor(Qt.PointingHandCursor)
 
-        # 使用主题管理器设置标签样式
-        label.setStyleSheet(self.theme_manager.get_label_style(font_size=13))
+                    # 更新悬停索引
+                    if self.item_delegate.hovered_index != row:
+                        self.item_delegate.set_hovered_index(row)
+                        self.list_widget.viewport().update()
+                else:
+                    # 鼠标不在任何项上
+                    if self.item_delegate.hovered_index != -1:
+                        self.item_delegate.set_hovered_index(-1)
+                        self.item_delegate.set_hovered_delete_index(-1)
+                        self.list_widget.viewport().update()
+                        self.setCursor(Qt.ArrowCursor)
 
-        label.setTextFormat(Qt.PlainText)
-        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        font_metrics = label.fontMetrics()
-        elided_text = font_metrics.elidedText(text, Qt.ElideRight, 200)
-        label.setText(elided_text)
+            elif event.type() == QEvent.Leave:
+                # 鼠标离开列表区域
+                if self.item_delegate.hovered_index != -1:
+                    self.item_delegate.set_hovered_index(-1)
+                    self.item_delegate.set_hovered_delete_index(-1)
+                    self.list_widget.viewport().update()
+                    self.setCursor(Qt.ArrowCursor)
 
-        layout.addWidget(label)
-        layout.addStretch()
-
-        time_label = QLabel(timestamp)
-        # 使用主题管理器设置时间标签样式
-        time_label.setStyleSheet(self.theme_manager.get_time_label_style())
-        time_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        layout.addWidget(time_label)
-
-        delete_btn = QPushButton('×')
-        delete_btn.setFixedSize(20, 20)
-        # 使用主题管理器设置删除按钮样式
-        delete_btn.setStyleSheet(self.theme_manager.get_delete_button_style())
-        delete_btn.clicked.connect(partial(self.remove_item_by_text, text))
-        layout.addWidget(delete_btn)
-
-        widget.setLayout(layout)
-
-        return widget
+        return super().eventFilter(obj, event)
 
     def paste_single_item(self, text):
         """粘贴单个项目到光标位置"""
@@ -991,49 +980,31 @@ class ClipboardWindow(QWidget):
             return
 
         try:
-            # 记录粘贴的内容和时间
-            self.last_pasted_text = text
-            self.last_paste_time = time.time()
-            self.paste_ignore_until = time.time() + 1.5
-
-            # 设置剪贴板
-            if set_clipboard_text(text):
-                self.last_clipboard_text = text
-
+            # 使用服务层准备粘贴
+            if self.clipboard_service.prepare_single_paste(text):
                 # 隐藏窗口
                 self.hide()
 
                 # 激活前一个窗口
-                if self.previous_window:
-                    set_foreground_window(self.previous_window)
-                    time.sleep(0.1)  # 给窗口激活留出时间
+                self.clipboard_service.restore_previous_window()
 
                 # 延迟400ms执行粘贴
                 QTimer.singleShot(400, self._execute_single_paste)
-        except Exception as e:
-            print(f"单项粘贴失败: {e}")
+        except Exception:
+            pass  # 单项粘贴失败
 
     def _execute_single_paste(self):
         """执行单项粘贴操作"""
-        simulate_paste()
+        self.clipboard_service.execute_paste()
 
     def remove_item_by_text(self, text):
         """删除指定项"""
-        # 使用列表推导式创建新列表，避免遍历中删除的问题
-        original_length = len(self.clipboard_data)
-        self.clipboard_data = [
-            item for item in self.clipboard_data
-            if (item['text'] if isinstance(item, dict) else item) != text
-        ]
-
-        # 如果列表长度发生变化，说明删除成功
-        if len(self.clipboard_data) < original_length:
-            self.update_list()
+        if self.clipboard_service.remove_item_by_text(text):
             self.save_data()
 
     def clear_clipboard(self):
         """清空剪贴板"""
-        if not self.clipboard_data:
+        if self.clipboard_service.get_data_count() == 0:
             return
 
         reply = QMessageBox.question(
@@ -1042,12 +1013,8 @@ class ClipboardWindow(QWidget):
         )
 
         if reply == QMessageBox.Yes:
-            self.clipboard_data.clear()
-            self.sequential_index = -1  # 重置顺序输出索引
-            self.update_list()
+            self.clipboard_service.clear_all()
             self.save_data()
-            set_clipboard_text('')
-            self.last_clipboard_text = ''
 
     def hide_window(self):
         self.hide()
@@ -1060,7 +1027,7 @@ class ClipboardWindow(QWidget):
             return
 
         # 记录当前活动窗口（在显示剪贴板窗口之前）
-        self.previous_window = get_foreground_window()
+        self.clipboard_service.save_previous_window()
 
         self.show()
         self.activateWindow()
@@ -1078,69 +1045,14 @@ class ClipboardWindow(QWidget):
 
     def save_data(self):
         """保存数据"""
-        try:
-            self.data_file.parent.mkdir(exist_ok=True)
-            with open(self.data_file, 'w', encoding='utf-8') as f:
-                json.dump(self.clipboard_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"保存数据失败: {e}")
+        data = self.clipboard_service.get_data_for_save()
+        self.data_model.save_clipboard_data(data)
 
     def load_data(self):
         """加载数据"""
-        try:
-            if self.data_file.exists():
-                with open(self.data_file, 'r', encoding='utf-8') as f:
-                    loaded_data = json.load(f)
-                    self.clipboard_data = []
-                    for item in loaded_data:
-                        if isinstance(item, str):
-                            self.clipboard_data.append({
-                                'text': item,
-                                'timestamp': datetime.now().strftime('%H:%M:%S')
-                            })
-                        else:
-                            self.clipboard_data.append(item)
-                    self.update_list()
-        except Exception as e:
-            print(f"加载数据失败: {e}")
-
-    def save_settings(self):
-        """保存设置"""
-        try:
-            self.settings_file.parent.mkdir(exist_ok=True)
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(self.settings, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"保存设置失败: {e}")
-
-    def load_settings(self):
-        """加载设置"""
-        try:
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    loaded_settings = json.load(f)
-                    self.settings.update(loaded_settings)
-            else:
-                # 首次启动，检测系统主题
-                self.settings['theme'] = self.detect_system_theme()
-        except Exception as e:
-            print(f"加载设置失败: {e}")
-            # 出错时也尝试检测系统主题
-            self.settings['theme'] = self.detect_system_theme()
-
-    def detect_system_theme(self):
-        """检测 Windows 系统主题"""
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-            )
-            value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
-            winreg.CloseKey(key)
-            return 'light' if value == 1 else 'dark'
-        except Exception:
-            return 'light'  # 默认日间模式
+        loaded_data = self.data_model.load_clipboard_data()
+        if loaded_data:
+            self.clipboard_service.load_data(loaded_data)
 
     def show_settings(self):
         """显示设置对话框"""
@@ -1159,7 +1071,7 @@ class ClipboardWindow(QWidget):
             self.floating_icon.double_clicked.connect(self.restore_from_capsule)
 
         # 每次进入胶囊模式都同步最新数量
-        self.floating_icon.count = len(self.clipboard_data)
+        self.floating_icon.count = self.clipboard_service.get_data_count()
 
     def toggle_capsule_mode(self):
         """切换胶囊模式"""
@@ -1271,7 +1183,7 @@ class ClipboardWindow(QWidget):
     def update_capsule_count(self):
         """更新浮动图标显示的数量"""
         if self.floating_icon and self.floating_icon.isVisible():
-            self.floating_icon.set_count(len(self.clipboard_data))
+            self.floating_icon.set_count(self.clipboard_service.get_data_count())
 
 
     def apply_settings(self, new_settings):
@@ -1280,11 +1192,13 @@ class ClipboardWindow(QWidget):
         old_output_mode = self.settings.get('output_mode')
         old_color_scheme = self.settings.get('color_scheme')
         self.settings.update(new_settings)
-        self.save_settings()
 
-        # 如果输出模式改变，重置索引到起始位置
+        # 保存设置到数据层
+        self.data_model.save_settings(self.settings)
+
+        # 如果输出模式改变，更新业务层
         if new_settings.get('output_mode') != old_output_mode:
-            self.sequential_index = -1  # 重置索引，下次使用时会初始化到正确位置
+            self.clipboard_service.set_output_mode(new_settings.get('output_mode'))
             self.update_mode_label()  # 更新模式标识
 
         # 如果主题或配色方案改变，应用新样式
@@ -1316,6 +1230,10 @@ class ClipboardWindow(QWidget):
             self.header.setDarkMode(is_dark)
             self.header.setColorScheme(color_scheme)
 
+        # 更新委托主题
+        if hasattr(self, 'item_delegate'):
+            self.item_delegate.set_theme(is_dark)
+
         # 使用主题管理器更新样式
         self.main_container.setStyleSheet(self.theme_manager.get_container_style())
         self.list_widget.setStyleSheet(self.theme_manager.get_list_widget_style())
@@ -1328,26 +1246,23 @@ class ClipboardWindow(QWidget):
     def do_quit_app(self):
         """退出程序"""
         # 清除剪贴板数据文件
-        self.clear_data_file()
+        self.data_model.clear_clipboard_data()
 
+        # 停止剪贴板监听器
+        if hasattr(self, 'clipboard_listener'):
+            self.clipboard_listener.stop()
+
+        # 停止轮询定时器（如果有）
         if hasattr(self, 'clipboard_check_timer'):
             self.clipboard_check_timer.stop()
 
         if hasattr(self, 'hotkey_listener'):
             try:
                 self.hotkey_listener.stop()
-            except Exception as e:
-                print(f"停止快捷键监听器失败: {e}")
+            except Exception:
+                pass  # 停止快捷键监听器失败
 
         QApplication.quit()
-
-    def clear_data_file(self):
-        """清除剪贴板数据文件"""
-        try:
-            if self.data_file.exists():
-                self.data_file.unlink()
-        except Exception as e:
-            print(f"清除数据文件失败: {e}")
 
 
 def check_single_instance():
@@ -1376,8 +1291,7 @@ def check_single_instance():
             return False
 
         return True
-    except Exception as e:
-        print(f"单实例检测失败: {e}")
+    except Exception:
         return True  # 出错时允许启动
 
 
