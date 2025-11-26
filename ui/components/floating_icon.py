@@ -63,33 +63,31 @@ class FloatingIcon(QWidget):
         self.edge_check_timer.setSingleShot(True)
         self.edge_check_timer.timeout.connect(self.check_edge_position)
 
-        # 初始应用阴影
+        # 初始应用阴影（仅胶囊模式）
         self.update_shadow()
 
     def update_shadow(self):
-        """更新阴影效果"""
+        """更新阴影效果（仅胶囊模式有阴影）"""
         try:
-            # 创建阴影效果
-            shadow = QGraphicsDropShadowEffect()
-            shadow.setBlurRadius(15)
-            shadow.setColor(QColor(0, 0, 0, 100))
-
             if self.is_capsule_mode:
-                # 胶囊模式：左侧阴影
+                # 胶囊模式：添加左侧阴影
+                shadow = QGraphicsDropShadowEffect()
+                shadow.setBlurRadius(15)
+                shadow.setColor(QColor(0, 0, 0, 100))
                 shadow.setOffset(-3, 0)  # 向左偏移3px
+                self.setGraphicsEffect(shadow)
             else:
-                # 圆形模式：右下阴影
-                shadow.setOffset(3, 3)  # 向右下偏移
-
-            self.setGraphicsEffect(shadow)
+                # 圆形模式：不使用阴影，避免更新问题
+                self.setGraphicsEffect(None)
         except RuntimeError:
             # 忽略阴影对象已删除的错误
             pass
 
     def set_count(self, count):
         """设置复制条数"""
-        self.count = count
-        self.repaint()  # 使用 repaint() 强制立即重绘
+        if self.count != count:  # 只有数量变化时才更新
+            self.count = count
+            self.repaint()
 
     def set_theme(self, is_dark, color_scheme):
         """设置主题"""

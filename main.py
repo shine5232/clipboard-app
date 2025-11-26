@@ -5,13 +5,16 @@
 
 import sys
 import time
+import json
+import ctypes
 
 # 设置 Windows 控制台编码为 UTF-8
 if sys.platform == 'win32':
     try:
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+        # 设置 line_buffering=True 确保每行输出都立即刷新
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
     except:
         pass
 
@@ -450,6 +453,7 @@ class ClipboardWindow(QWidget):
         """注册 Windows 剪贴板监听器"""
         # 使用定时器轮询剪贴板（最可靠的方式）
         self.last_clipboard_text = get_clipboard_text() or ""
+        # 不指定父对象，确保定时器独立于窗口可见性运行
         self.clipboard_check_timer = QTimer()
         self.clipboard_check_timer.timeout.connect(self.check_clipboard_change)
         self.clipboard_check_timer.start(300)  # 每300ms检查一次
@@ -1134,10 +1138,11 @@ class ClipboardWindow(QWidget):
             is_dark = self.settings.get('theme') == 'dark'
             color_scheme = self.settings.get('color_scheme', 'pure_blue')
             self.floating_icon.set_theme(is_dark, color_scheme)
-            # 设置数量
-            self.floating_icon.set_count(len(self.clipboard_data))
             # 连接信号
             self.floating_icon.double_clicked.connect(self.restore_from_capsule)
+
+        # 每次进入胶囊模式都同步最新数量
+        self.floating_icon.count = len(self.clipboard_data)
 
     def toggle_capsule_mode(self):
         """切换胶囊模式"""
@@ -1248,7 +1253,7 @@ class ClipboardWindow(QWidget):
 
     def update_capsule_count(self):
         """更新浮动图标显示的数量"""
-        if self.floating_icon:
+        if self.floating_icon and self.floating_icon.isVisible():
             self.floating_icon.set_count(len(self.clipboard_data))
 
 
@@ -1301,7 +1306,8 @@ class ClipboardWindow(QWidget):
 
     def do_quit_app(self):
         """退出程序"""
-        self.save_data()
+        # 清除剪贴板数据文件
+        self.clear_data_file()
 
         if hasattr(self, 'clipboard_check_timer'):
             self.clipboard_check_timer.stop()
@@ -1313,6 +1319,14 @@ class ClipboardWindow(QWidget):
                 print(f"停止快捷键监听器失败: {e}")
 
         QApplication.quit()
+
+    def clear_data_file(self):
+        """清除剪贴板数据文件"""
+        try:
+            if self.data_file.exists():
+                self.data_file.unlink()
+        except Exception as e:
+            print(f"清除数据文件失败: {e}")
 
 
 def check_single_instance():
