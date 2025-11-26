@@ -1,151 +1,107 @@
-# 📋 剪贴板助手 (Clipboard Helper)
+# 剪贴板助手 📋
 
-一个功能强大的 Windows 剪贴板增强工具，支持多种输出模式、主题切换和批量粘贴。
+> 一个功能强大、界面美观的 Windows 剪贴板增强工具
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.7+-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
+[![Python Version](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
+[![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)](https://pypi.org/project/PyQt5/)
+[![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
 ---
 
-## ✨ 主要特性
+## ✨ 核心特性
 
-- 🔥 **自动收集** - 所有复制的内容自动保存到列表
-- 🎯 **三种输出模式** - 逗号拼接、顺序输出（FIFO）、倒序输出（LIFO）
-- 🎨 **主题切换** - 支持日间模式和暗夜模式
-- ⚡ **一键粘贴** - `Ctrl+Space` 快捷粘贴
-- 💾 **持久化存储** - 数据自动保存，重启后恢复
-- 🪟 **置顶显示** - 窗口始终保持在最前
-- 🔔 **系统托盘** - 最小化到托盘，不占用任务栏
-- 🛡️ **智能去重** - 自动过滤重复内容
-- 📊 **模式标识** - 实时显示当前输出模式
+### 🎯 主要功能
+- **自动捕获** - 自动监听 Ctrl+C 复制操作，智能记录剪贴板内容
+- **批量粘贴** - 支持多种输出模式：逗号拼接、顺序输出、倒序输出
+- **胶囊模式** - 创新的交互体验，双击标题栏缩小为胶囊悬浮在屏幕右侧
+- **快捷操作** - 全局快捷键支持，随时随地快速操作
+- **智能去重** - 自动过滤重复内容，保持列表整洁
+
+### 🎨 界面设计
+- **精美主题** - 支持日间/暗夜模式，4 种配色方案可选
+- **流畅动画** - 丝滑的过渡动画和交互反馈
+- **现代UI** - 无边框设计、渐变效果、圆角阴影
+- **虚拟化渲染** - 即使数千条记录也能流畅滚动
+
+### 🔧 系统集成
+- **系统托盘** - 最小化到托盘，不占用任务栏
+- **自定义菜单** - 精美的托盘右键菜单
+- **单实例运行** - 防止重复启动
+- **窗口置顶** - 始终显示在最前方
 
 ---
 
 ## 🚀 快速开始
 
-### 方法一：使用可执行文件（推荐）
+### 环境要求
 
-1. 下载 `ClipboardHelper.exe`
-2. 双击运行
-3. 开始使用！
+- **操作系统**: Windows 7 / 8 / 10 / 11
+- **Python**: 3.14 或更高版本
+- **依赖库**: PyQt5, pynput, pywin32
 
-### 方法二：从源码运行
+### 安装依赖
 
 ```bash
-# 1. 克隆或下载项目
-cd clipboard-app
+pip install PyQt5 pynput pywin32
+```
 
-# 2. 安装依赖
-pip install -r requirements.txt
+### 运行程序
 
-# 3. 运行程序
+```bash
 python main.py
 ```
 
----
-
-## ⌨️ 快捷键
-
-| 快捷键 | 功能 | 说明 |
-|--------|------|------|
-| `Ctrl+C` | 复制内容 | 复制的内容自动添加到列表 |
-| **`Ctrl+Space`** | **批量粘贴** | 根据当前输出模式自动粘贴 |
-| `Ctrl+Shift+C` | 显示/隐藏窗口 | 切换窗口显示状态 |
-| `Ctrl+Shift+Q` | 退出程序 | 关闭应用程序 |
+或者双击 `main.py` 文件运行。
 
 ---
 
-## 🎯 输出模式详解
+## 📖 使用指南
 
-### 1. 逗号拼接模式（标识：拼）
+### 基础操作
 
-将所有剪贴板记录用逗号连接，一次性粘贴全部内容。
+#### 1. 复制内容
+- 在任意应用中使用 `Ctrl+C` 复制内容
+- 剪贴板助手会自动捕获并记录
+- 重复内容会自动去重
 
-**使用场景**：需要批量输入多个值
+#### 2. 批量粘贴
+- **方法一**: 按下全局快捷键 `Ctrl+Space`
+- **方法二**: 点击剪贴板助手窗口中的列表项
 
-**示例**：
-```
-收集内容：
-  138****1234
-  139****5678
-  136****9012
+#### 3. 输出模式
+- **逗号拼接**: 将所有内容用逗号连接后粘贴
+- **顺序输出**: 按添加顺序依次粘贴（每次 Ctrl+Space 粘贴一条）
+- **倒序输出**: 按添加倒序依次粘贴（每次 Ctrl+Space 粘贴一条）
 
-粘贴结果：138****1234,139****5678,136****9012
-```
+### 胶囊模式
 
-### 2. 顺序输出模式（标识：顺）
+#### 进入胶囊模式
+- **双击标题栏** - 主窗口会缩小并飞到屏幕右侧成为胶囊状悬浮窗
+- 胶囊会记住主窗口的原始位置
 
-先进先出（FIFO）原则，从第一条记录开始依次输出。
+#### 恢复主窗口
+- **鼠标悬停** - 将鼠标移动到胶囊上，会自动飞回并展开主窗口
+- **双击胶囊** - 双击胶囊也可以恢复主窗口
 
-**使用场景**：按添加顺序逐条粘贴
+#### 使用场景
+- 需要多次复制粘贴时，使用胶囊模式不遮挡工作区域
+- 临时隐藏窗口但又想快速调出
 
-**特点**：
-- 从第一条开始往后输出
-- 每次 `Ctrl+Space` 粘贴一条
-- 输出完所有记录后循环回到第一条
+### 全局快捷键
 
-### 3. 倒序输出模式（标识：倒）
+| 快捷键 | 功能 |
+|-------|------|
+| `Ctrl+Space` | 批量粘贴 |
+| `Ctrl+Shift+C` | 显示/隐藏主窗口 |
+| `Ctrl+Shift+Q` | 退出程序 |
 
-后进先出（LIFO）原则，从最后一条记录开始倒序输出。
+### 系统托盘
 
-**使用场景**：最新内容优先粘贴
-
-**特点**：
-- 从最后一条开始往前输出
-- 每次 `Ctrl+Space` 粘贴一条
-- 输出完所有记录后循环回到最后一条
-
-> **💡 提示**：切换输出模式时，会自动重置到相应的起始位置
-
----
-
-## 📖 使用说明
-
-### 📥 基本使用流程
-
-```
-1️⃣ 正常复制内容（Ctrl+C）
-   ↓
-2️⃣ 内容自动添加到列表
-   ↓
-3️⃣ 重复步骤1-2，收集多条内容
-   ↓
-4️⃣ 在设置中选择输出模式
-   ↓
-5️⃣ 按 Ctrl+Space 执行粘贴
-```
-
-### ⚙️ 设置功能
-
-点击标题栏的齿轮图标打开设置对话框：
-
-#### 输出模式
-- **逗号拼接**：将所有记录用逗号连接
-- **顺序输出**：从第一条开始依次粘贴（FIFO）
-- **倒序输出**：从最后一条开始倒序粘贴（LIFO）
-
-#### 系统主题
-- **日间模式**：清新明亮的浅色主题
-- **暗夜模式**：护眼舒适的深色主题
-
-设置更改后可以：
-- **应用**：保存设置但不关闭对话框
-- **确定**：保存设置并关闭对话框
-- **取消**：放弃更改并关闭对话框
-
-### 🎛️ 窗口管理
-
-| 操作 | 方法 |
-|------|------|
-| 查看当前模式 | 标题栏显示模式标识（拼/顺/倒） |
-| 删除单条记录 | 点击右侧 `×` 按钮 |
-| 清空所有记录 | 点击顶部 🗑️ 按钮 |
-| 打开设置 | 点击齿轮 ⚙️ 按钮 |
-| 拖动窗口位置 | 按住顶部渐变区域拖动 |
-| 最小化到托盘 | 点击 `×` 关闭按钮 |
-| 恢复窗口 | 双击托盘图标或按 `Ctrl+Shift+C` |
+- **单击图标**: 无操作
+- **双击图标**: 显示/隐藏主窗口
+- **右键图标**: 显示菜单
+  - 显示窗口
+  - 退出程序
 
 ---
 
@@ -372,42 +328,136 @@ pip install -r requirements.txt
 
 ---
 
-## 📊 项目结构
+## ⚙️ 配置说明
 
+### 输出模式
+
+在设置中可以选择三种输出模式：
+
+1. **逗号拼接模式**
+   ```
+   复制: "apple", "banana", "cherry"
+   粘贴: apple,banana,cherry
+   ```
+
+2. **顺序输出模式**
+   ```
+   第一次 Ctrl+Space: apple
+   第二次 Ctrl+Space: banana
+   第三次 Ctrl+Space: cherry
+   ```
+
+3. **倒序输出模式**
+   ```
+   第一次 Ctrl+Space: cherry
+   第二次 Ctrl+Space: banana
+   第三次 Ctrl+Space: apple
+   ```
+
+### 主题设置
+
+#### 系统主题
+- **日间模式**: 明亮清新的浅色主题
+- **暗夜模式**: 护眼舒适的深色主题
+
+#### 配色方案
+- **魅力蓝** (blue_gradient): 蓝紫渐变，神秘优雅
+- **天空蓝** (pure_blue): 清新蓝色，清爽明快
+- **青草绿** (pure_green): 自然绿色，清新护眼
+- **樱花粉** (sakura_pink): 浪漫粉色，温柔可爱
+
+### 数据存储
+
+应用数据存储在用户目录：
 ```
-clipboard-app/
-├── main.py                    # 主程序
-├── requirements.txt           # Python 依赖
-├── build.bat                  # 打包脚本
-├── README.md                  # 本文档
-└── data/
-    ├── clipboard_data.json    # 剪贴板数据（自动生成）
-    └── settings.json          # 用户设置（自动生成）
+C:\Users\<用户名>\AppData\Roaming\ClipboardHelper\
+├── clipboard_data.json    # 剪贴板数据（临时，退出时清除）
+└── settings.json          # 用户设置（持久保存）
 ```
+
+**注意**: 出于隐私考虑，剪贴板数据在程序退出时会自动清除，下次启动时从空白状态开始。
 
 ---
 
-## 🌟 特性亮点
+## 🏗️ 项目结构
 
-### 🎯 多模式输出
-- 根据不同场景选择合适的输出方式
-- 逗号拼接适合批量输入
-- 顺序/倒序输出适合逐条处理
+```
+clipboard-app/
+├── main.py                 # 应用入口
+├── models/                 # 数据模型层
+│   └── data_model.py
+├── services/               # 业务逻辑层
+│   └── clipboard_service.py
+├── ui/                     # UI 层
+│   └── components/         # UI 组件
+│       ├── floating_icon.py
+│       ├── tray_menu.py
+│       └── clipboard_delegate.py
+├── utils/                  # 工具模块
+│   ├── clipboard_utils.py
+│   ├── clipboard_listener.py
+│   ├── keyboard_simulator.py
+│   └── window_manager.py
+├── themes/                 # 主题管理
+│   └── theme_manager.py
+├── README.md              # 项目说明（本文档）
+└── ARCHITECTURE.md        # 架构文档
+```
 
-### 🎨 主题系统
-- 完整的明暗主题支持
-- 所有界面元素统一风格
-- 实时切换无需重启
+详细架构说明请参考 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
-### 📊 直观反馈
-- 模式标识实时显示
-- 记录数量一目了然
-- 每条记录显示时间戳
+---
 
-### ⚡ 高效操作
-- 全局快捷键随时调用
-- 智能去重避免重复
-- 自动保存无需手动
+## 🔧 开发指南
+
+### 技术栈
+
+- **GUI 框架**: PyQt5
+- **动画引擎**: QPropertyAnimation
+- **剪贴板**: Windows Clipboard API
+- **快捷键**: pynput
+- **窗口管理**: pywin32
+
+### 架构设计
+
+采用 MVC（Model-View-Controller）架构：
+
+- **Model**: `DataModel` - 数据持久化
+- **View**: `ClipboardWindow` 及 UI 组件 - 界面展示
+- **Controller**: `ClipboardService` - 业务逻辑
+
+---
+
+## 🐛 常见问题
+
+### Q: 剪贴板监听不工作？
+**A**: 确保程序以管理员权限运行，或者检查是否有其他程序占用剪贴板。
+
+### Q: 快捷键冲突？
+**A**: 当前版本快捷键固定，如有冲突请关闭冲突的应用或联系开发者。
+
+### Q: 动画卡顿？
+**A**: 尝试关闭其他占用 GPU 的程序，或在任务管理器中提高程序优先级。
+
+### Q: 数据丢失？
+**A**: 剪贴板数据在退出时会自动清除，这是出于隐私保护的设计。如需保留数据，可以在源码中修改 `do_quit_app` 方法。
+
+### Q: 程序启动提示已在运行？
+**A**: 检查系统托盘是否已有程序图标，或使用任务管理器结束 Python 进程。
+
+---
+
+## 📝 版本历史
+
+### v1.0.0 (2025-11-27)
+- ✨ 首次发布
+- ✅ 完整的剪贴板管理功能
+- ✅ 胶囊模式（双击标题栏缩小飞出，鼠标悬停恢复）
+- ✅ 主题系统（日间/暗夜模式 + 4种配色）
+- ✅ 全局快捷键
+- ✅ 系统托盘集成
+- ✅ 虚拟化列表渲染
+- ✅ 流畅的缩放动画
 
 ---
 
@@ -415,32 +465,36 @@ clipboard-app/
 
 欢迎提交 Issue 和 Pull Request！
 
-### 开发环境设置
+### 贡献流程
 
-```bash
-# 1. 克隆项目
-git clone https://github.com/yourusername/clipboard-helper.git
-cd clipboard-helper
-
-# 2. 安装依赖
-pip install -r requirements.txt
-
-# 3. 运行测试
-python main.py
-```
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ### 代码规范
 
-- 使用 4 空格缩进
-- 遵循 PEP 8 规范
-- 添加必要的注释
-- 提交前测试所有功能
+- 遵循 PEP 8 编码规范
+- 添加必要的注释和文档字符串
+- 保持代码简洁清晰
+- 测试新功能确保稳定性
 
 ---
 
-## 📄 许可证
+## 📄 开源协议
 
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 协议开源。详见 [LICENSE](LICENSE) 文件。
+
+---
+
+## 👨‍💻 作者
+
+**LZ**
+
+如有问题或建议，欢迎通过以下方式联系：
+
+- 💬 Issues: [GitHub Issues](https://github.com/yourusername/clipboard-app/issues)
 
 ---
 
@@ -448,25 +502,16 @@ python main.py
 
 感谢以下开源项目：
 
-- [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - 强大的 GUI 框架
-- [pynput](https://github.com/moses-palmer/pynput) - 全局快捷键支持
-- [PyInstaller](https://www.pyinstaller.org/) - Python 打包工具
-- [pywin32](https://github.com/mhammond/pywin32) - Windows API 绑定
+- [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - 强大的 Python GUI 框架
+- [pynput](https://github.com/moses-palmer/pynput) - 全局快捷键监听
+- [pywin32](https://github.com/mhammond/pywin32) - Windows API 支持
 
 ---
 
-## 📞 支持与反馈
+<p align="center">
+  Made with ❤️ by LZ
+</p>
 
-如有问题或建议，请：
-1. 提交 [Issue](https://github.com/yourusername/clipboard-helper/issues)
-2. 查看文档获取更多帮助
-
----
-
-**⭐ 如果这个项目对你有帮助，请给个 Star！**
-
----
-
-<div align="center">
-Made with ❤️
-</div>
+<p align="center">
+  <sub>如果你喜欢这个项目，别忘了给它一个 ⭐️</sub>
+</p>

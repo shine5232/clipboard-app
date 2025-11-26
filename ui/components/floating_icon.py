@@ -13,12 +13,16 @@ class FloatingIcon(QWidget):
 
     # 信号
     double_clicked = pyqtSignal()
+    mouse_entered = pyqtSignal()  # 鼠标进入信号
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.count = 0  # 复制记录条数
         self.is_dark = False  # 是否暗夜模式
         self.color_scheme = 'pure_blue'  # 配色方案
+
+        # 截图相关
+        self.window_pixmap = None  # 主窗口截图
 
         # 拖拽相关
         self.dragging = False
@@ -27,6 +31,7 @@ class FloatingIcon(QWidget):
         # 胶囊模式相关
         self.is_capsule_mode = False  # 是否为胶囊模式
         self.is_animating = False  # 是否正在动画中
+        self.allow_hover_restore = False  # 是否允许鼠标悬停恢复（防止飞出时立即触发）
         self.edge_threshold = 60  # 靠近边缘的距离阈值（像素）- 减小到60px，更不容易误触发
 
         # 图标尺寸
@@ -93,6 +98,16 @@ class FloatingIcon(QWidget):
         """设置主题"""
         self.is_dark = is_dark
         self.color_scheme = color_scheme
+        self.update()
+
+    def set_window_pixmap(self, pixmap):
+        """设置主窗口截图"""
+        self.window_pixmap = pixmap
+        self.update()
+
+    def clear_window_pixmap(self):
+        """清除主窗口截图"""
+        self.window_pixmap = None
         self.update()
 
     def get_colors(self):
@@ -227,9 +242,9 @@ class FloatingIcon(QWidget):
 
     def enterEvent(self, event):
         """鼠标进入"""
-        # 如果是胶囊模式，鼠标悬停时展开为圆形
-        if self.is_capsule_mode and not self.is_animating:
-            self.morph_to_circle()
+        # 如果是胶囊模式且允许悬停恢复，鼠标悬停时发送信号
+        if self.is_capsule_mode and not self.is_animating and self.allow_hover_restore:
+            self.mouse_entered.emit()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
@@ -242,6 +257,18 @@ class FloatingIcon(QWidget):
         """绘制图标"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+
+        # 如果有截图，优先绘制截图
+        if self.window_pixmap:
+            # 绘制缩放的截图
+            scaled_pixmap = self.window_pixmap.scaled(
+                self.width(), self.height(),
+                Qt.IgnoreAspectRatio,
+                Qt.SmoothTransformation
+            )
+            painter.drawPixmap(0, 0, scaled_pixmap)
+            return
 
         # 获取配色
         color1, color2 = self.get_colors()

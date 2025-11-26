@@ -418,6 +418,8 @@ class ClipboardWindow(QWidget):
         # 胶囊模式
         self.is_capsule_mode = False  # 是否处于胶囊模式
         self.floating_icon = None  # 浮动图标组件
+        self.saved_window_pos = None  # 保存主窗口位置（用于从胶囊模式恢复）
+        self.saved_window_pixmap = None  # 保存主窗口截图（用于飞入动画）
 
         # 初始化UI
         self.init_ui()
@@ -1067,8 +1069,9 @@ class ClipboardWindow(QWidget):
             is_dark = self.settings.get('theme') == 'dark'
             color_scheme = self.settings.get('color_scheme', 'pure_blue')
             self.floating_icon.set_theme(is_dark, color_scheme)
-            # 连接信号
+            # 连接信号：双击和鼠标悬停都恢复主窗口
             self.floating_icon.double_clicked.connect(self.restore_from_capsule)
+            self.floating_icon.mouse_entered.connect(self.restore_from_capsule)
 
         # 每次进入胶囊模式都同步最新数量
         self.floating_icon.count = self.clipboard_service.get_data_count()
@@ -1089,17 +1092,21 @@ class ClipboardWindow(QWidget):
 
         self.is_capsule_mode = True
 
+        # 保存主窗口当前位置（用于恢复）
+        self.saved_window_pos = self.pos()
+
+        # 对主窗口进行截图（用于飞出和飞入动画）
+        from PyQt5.QtGui import QPixmap
+        self.saved_window_pixmap = self.main_container.grab()
+
         # 初始化浮动图标
         self.init_capsule_widget()
 
-        # 获取主窗口标题栏位置作为动画起点
-        start_pos = self.pos()
-        # 标题栏中心位置（标题栏高度约50px）
-        start_x = start_pos.x() + self.width() // 2
-        start_y = start_pos.y() + 25  # 标题栏中心位置
+        # 禁用鼠标悬停恢复（防止飞出时立即触发）
+        self.floating_icon.allow_hover_restore = False
 
-        # 隐藏主窗口
-        self.hide()
+        # 设置截图到浮动图标
+        self.floating_icon.set_window_pixmap(self.saved_window_pixmap)
 
         # 计算目标位置（屏幕右侧胶囊位置）
         from PyQt5.QtWidgets import QApplication
@@ -1109,37 +1116,43 @@ class ClipboardWindow(QWidget):
         capsule_x = screen.width() - self.floating_icon.capsule_width
         capsule_y = (screen.height() - self.floating_icon.capsule_height) // 2
 
-        # 先设置为小圆形（使用较小的尺寸），从标题栏位置开始
-        small_size = 40  # 小圆形大小
+        # 胶囊从主窗口的大小和位置开始（显示截图，不是胶囊形状）
+        start_x = self.pos().x()
+        start_y = self.pos().y()
+        start_width = self.width()
+        start_height = self.height()
+
+        # 先不设置为胶囊形态，让它显示截图
         self.floating_icon.is_capsule_mode = False
-        self.floating_icon.setGeometry(start_x - small_size // 2,
-                                       start_y - small_size // 2,
-                                       small_size,
-                                       small_size)
+        self.floating_icon.setGeometry(start_x, start_y, start_width, start_height)
         self.floating_icon.show()
 
-        # 第一阶段：小圆形飞到右侧并放大到正常圆形大小
+        # 延迟隐藏主窗口，让浮动图标先显示出来
+        QTimer.singleShot(50, self.hide)
+
+        # 创建缩放飞出动画（从主窗口大小缩小到胶囊大小并移动到右侧）
         fly_animation = QPropertyAnimation(self.floating_icon, b"geometry")
-        fly_animation.setDuration(600)  # 600ms飞行动画
-        fly_animation.setEasingCurve(QEasingCurve.OutCubic)
+        fly_animation.setDuration(500)  # 500ms缩放飞行动画
+        fly_animation.setEasingCurve(QEasingCurve.InOutCubic)
 
-        # 飞行目标：屏幕右侧边缘位置（贴边），放大到正常圆形大小
-        # 让圆形直接飞到右边缘，圆形的右边缘贴着屏幕边缘
-        fly_target_x = screen.width() - self.floating_icon.icon_size
-        fly_target_y = (screen.height() - self.floating_icon.icon_size) // 2
+        fly_animation.setStartValue(QRect(start_x, start_y, start_width, start_height))
+        fly_animation.setEndValue(QRect(capsule_x, capsule_y,
+                                       self.floating_icon.capsule_width,
+                                       self.floating_icon.capsule_height))
 
-        fly_animation.setStartValue(QRect(start_x - small_size // 2,
-                                          start_y - small_size // 2,
-                                          small_size,
-                                          small_size))
-        fly_animation.setEndValue(QRect(fly_target_x, fly_target_y,
-                                        self.floating_icon.icon_size,
-                                        self.floating_icon.icon_size))
+        # 在动画80%完成时清除截图并切换为胶囊模式
+        def switch_to_capsule():
+            if self.floating_icon:
+                self.floating_icon.clear_window_pixmap()
+                self.floating_icon.is_capsule_mode = True
+                self.floating_icon.update()
 
-        # 飞行完成后，延迟变形为胶囊
+        QTimer.singleShot(400, switch_to_capsule)  # 500ms * 0.8 = 400ms
+
+        # 动画完成后启用鼠标悬停恢复
         def on_fly_finished():
-            # 300ms后变形为胶囊
-            QTimer.singleShot(300, lambda: self.floating_icon.morph_to_capsule() if self.floating_icon else None)
+            if self.floating_icon:
+                self.floating_icon.allow_hover_restore = True
 
         fly_animation.finished.connect(on_fly_finished)
         fly_animation.start()
@@ -1154,31 +1167,75 @@ class ClipboardWindow(QWidget):
 
         self.is_capsule_mode = False
 
-        # 获取浮动图标当前位置，将主窗口移动到该位置附近
+        # 禁用鼠标悬停恢复（防止恢复过程中重复触发）
         if self.floating_icon:
-            icon_pos = self.floating_icon.pos()
-            # 计算主窗口位置：让主窗口的右上角对齐图标位置
-            # 向左偏移主窗口宽度，向上稍微偏移
-            new_x = icon_pos.x() - self.width() + self.floating_icon.width()
-            new_y = icon_pos.y() - 50  # 向上偏移50px，避免被图标遮挡
+            self.floating_icon.allow_hover_restore = False
+
+        # 获取浮动图标当前位置和保存的主窗口位置
+        if self.floating_icon and self.saved_window_pos and self.saved_window_pixmap:
+            from PyQt5.QtWidgets import QApplication
+            from PyQt5.QtCore import QRect, QPropertyAnimation, QEasingCurve, QTimer
 
             # 确保窗口不超出屏幕边界
-            from PyQt5.QtWidgets import QApplication
             screen = QApplication.desktop().screenGeometry()
+            if self.saved_window_pos.x() < 0 or self.saved_window_pos.x() + self.width() > screen.width():
+                self.saved_window_pos.setX(max(0, min(self.saved_window_pos.x(), screen.width() - self.width())))
+            if self.saved_window_pos.y() < 0 or self.saved_window_pos.y() + self.height() > screen.height():
+                self.saved_window_pos.setY(max(0, min(self.saved_window_pos.y(), screen.height() - self.height())))
 
-            # 限制在屏幕范围内
-            new_x = max(0, min(new_x, screen.width() - self.width()))
-            new_y = max(0, min(new_y, screen.height() - self.height()))
+            # 创建放大飞入动画（从胶囊大小放大到主窗口大小并移动回原位置）
+            fly_back_animation = QPropertyAnimation(self.floating_icon, b"geometry")
+            fly_back_animation.setDuration(500)  # 500ms缩放飞行动画
+            fly_back_animation.setEasingCurve(QEasingCurve.InOutCubic)
 
-            self.move(new_x, new_y)
+            # 当前位置（胶囊状态）
+            current_rect = self.floating_icon.geometry()
 
-            # 隐藏浮动图标
-            self.floating_icon.hide()
+            # 目标位置（主窗口大小和位置）
+            target_x = self.saved_window_pos.x()
+            target_y = self.saved_window_pos.y()
+            target_width = self.width()
+            target_height = self.height()
 
-        # 显示主窗口
-        self.show()
-        self.activateWindow()
-        self.raise_()
+            fly_back_animation.setStartValue(current_rect)
+            fly_back_animation.setEndValue(QRect(target_x, target_y, target_width, target_height))
+
+            # 在动画20%完成时切换为截图模式
+            def switch_to_screenshot():
+                if self.floating_icon:
+                    self.floating_icon.is_capsule_mode = False
+                    self.floating_icon.set_window_pixmap(self.saved_window_pixmap)
+
+            QTimer.singleShot(100, switch_to_screenshot)  # 500ms * 0.2 = 100ms
+
+            # 在动画80%完成时显示主窗口
+            def show_main_window():
+                self.move(self.saved_window_pos)
+                self.show()
+                self.activateWindow()
+                self.raise_()
+
+            QTimer.singleShot(400, show_main_window)  # 500ms * 0.8 = 400ms
+
+            # 动画完成后隐藏浮动图标并清除截图
+            def cleanup():
+                if self.floating_icon:
+                    self.floating_icon.hide()
+                    self.floating_icon.clear_window_pixmap()
+
+            QTimer.singleShot(500, cleanup)
+
+            fly_back_animation.start()
+
+            # 保存动画引用，避免被垃圾回收
+            self.floating_icon._fly_back_animation = fly_back_animation
+        else:
+            # 如果没有保存位置，直接在当前位置显示
+            if self.floating_icon:
+                self.floating_icon.hide()
+            self.show()
+            self.activateWindow()
+            self.raise_()
 
     def update_capsule_count(self):
         """更新浮动图标显示的数量"""
