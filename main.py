@@ -40,6 +40,7 @@ from themes.theme_manager import ThemeManager, get_color_scheme_colors
 # 导入UI组件
 from ui.components.clickable_label import ClickableLabel
 from ui.components.floating_icon import FloatingIcon
+from ui.components.tray_menu import TrayMenu
 
 
 class SettingsDialog(QDialog):
@@ -845,22 +846,17 @@ class ClipboardWindow(QWidget):
 
         self.tray_icon.setIcon(QIcon(pixmap))
 
-        tray_menu = QMenu()
-        show_action = QAction('显示窗口', self)
-        show_action.triggered.connect(self.show_window)
-        tray_menu.addAction(show_action)
+        # 创建自定义托盘菜单
+        self.tray_menu = TrayMenu()
+        self.tray_menu.show_window_clicked.connect(self.show_window)
+        self.tray_menu.quit_clicked.connect(self.do_quit_app)
 
-        hide_action = QAction('隐藏窗口', self)
-        hide_action.triggered.connect(self.hide_window)
-        tray_menu.addAction(hide_action)
+        # 设置主题
+        is_dark = self.settings.get('theme') == 'dark'
+        color_scheme = self.settings.get('color_scheme', 'pure_blue')
+        self.tray_menu.set_theme(is_dark, color_scheme)
 
-        tray_menu.addSeparator()
-
-        quit_action = QAction('退出程序', self)
-        quit_action.triggered.connect(self.do_quit_app)
-        tray_menu.addAction(quit_action)
-
-        self.tray_icon.setContextMenu(tray_menu)
+        # 不使用系统默认菜单，改用自定义菜单
         self.tray_icon.activated.connect(self.tray_icon_activated)
         self.tray_icon.show()
         self.tray_icon.setToolTip('剪贴板助手\nCtrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出')
@@ -868,6 +864,9 @@ class ClipboardWindow(QWidget):
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
             self.do_toggle_window()
+        elif reason == QSystemTrayIcon.Context:
+            # 右键点击显示自定义菜单
+            self.tray_menu.show_at_cursor()
 
     def header_mouse_press(self, event):
         if event.button() == Qt.LeftButton:
@@ -1052,7 +1051,6 @@ class ClipboardWindow(QWidget):
 
     def hide_window(self):
         self.hide()
-        self.show_notification('程序已最小化到系统托盘')
 
     def show_window(self):
         """显示主窗口"""
@@ -1122,8 +1120,27 @@ class ClipboardWindow(QWidget):
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     loaded_settings = json.load(f)
                     self.settings.update(loaded_settings)
+            else:
+                # 首次启动，检测系统主题
+                self.settings['theme'] = self.detect_system_theme()
         except Exception as e:
             print(f"加载设置失败: {e}")
+            # 出错时也尝试检测系统主题
+            self.settings['theme'] = self.detect_system_theme()
+
+    def detect_system_theme(self):
+        """检测 Windows 系统主题"""
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+            )
+            value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            winreg.CloseKey(key)
+            return 'light' if value == 1 else 'dark'
+        except Exception:
+            return 'light'  # 默认日间模式
 
     def show_settings(self):
         """显示设置对话框"""
@@ -1283,6 +1300,10 @@ class ClipboardWindow(QWidget):
         # 更新浮动图标主题
         if self.floating_icon:
             self.floating_icon.set_theme(is_dark, color_scheme)
+
+        # 更新托盘菜单主题
+        if hasattr(self, 'tray_menu'):
+            self.tray_menu.set_theme(is_dark, color_scheme)
 
     def update_theme_style(self, is_dark=False, color_scheme='pure_blue'):
         """更新主题样式"""
