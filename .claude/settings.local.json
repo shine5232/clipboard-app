@@ -21,7 +21,14 @@
       "Bash(powershell -Command \"Stop-Process -Name python -Force\")",
       "Bash(powershell -Command \"Stop-Process -Id 17656 -Force\")",
       "Bash(powershell -Command \"Stop-Process -Id 26072 -Force\")",
-      "Bash(powershell -Command \"Stop-Process -Id 18916 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 18916 -Force\")",
+      "Bash(powershell -Command \"Get-Item nul | Select-Object Name,Length,CreationTime,LastWriteTime\")",
+      "Bash(powershell -Command \"Get-Item nul -Force | Select-Object FullName, Attributes, LinkType, Target\")",
+      "Bash(exit 0)",
+      "Bash(powershell -Command \"python ''E:\\clipboard-app\\main.py''\")",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 5\")",
+      "Bash(powershell -Command \"Test-Path ''C:\\Users\\asus\\AppData\\Roaming\\ClipboardHelper''\")",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []

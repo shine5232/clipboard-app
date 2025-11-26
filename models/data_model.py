@@ -5,6 +5,7 @@
 
 import json
 import winreg
+import os
 from pathlib import Path
 from PyQt5.QtCore import QObject
 
@@ -20,7 +21,13 @@ class DataModel:
             data_dir: 数据目录路径（可选）
         """
         if data_dir is None:
-            data_dir = Path(__file__).parent.parent / 'data'
+            # 使用用户 AppData 目录，确保打包后也能正常读写
+            appdata_dir = os.getenv('APPDATA')  # 获取 C:\Users\用户名\AppData\Roaming
+            if appdata_dir:
+                data_dir = Path(appdata_dir) / 'ClipboardHelper'
+            else:
+                # 如果获取不到 AppData，使用用户主目录
+                data_dir = Path.home() / '.clipboard_helper'
         else:
             data_dir = Path(data_dir)
 
@@ -29,7 +36,7 @@ class DataModel:
         self.settings_file = data_dir / 'settings.json'
 
         # 确保目录存在
-        self.data_dir.mkdir(exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def save_clipboard_data(self, data):
         """
@@ -91,8 +98,11 @@ class DataModel:
             bool: 是否保存成功
         """
         try:
+            print(f"[配置保存] 保存路径: {self.settings_file}")
+            print(f"[配置保存] 保存内容: {settings}")
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
+            print(f"[配置保存] 保存成功!")
             return True
         except Exception as e:
             print(f"保存设置失败: {e}")
@@ -112,10 +122,16 @@ class DataModel:
         }
 
         try:
+            print(f"[配置加载] 配置文件路径: {self.settings_file}")
+            print(f"[配��加载] 文件是否存在: {self.settings_file.exists()}")
             if self.settings_file.exists():
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     loaded_settings = json.load(f)
+                    print(f"[配置加载] 加载的配置: {loaded_settings}")
                     default_settings.update(loaded_settings)
+            else:
+                print(f"[配置加载] 配置文件不存在，使用默认配置")
+            print(f"[配置加载] 最终配置: {default_settings}")
             return default_settings
         except Exception as e:
             print(f"加载设置失败: {e}")

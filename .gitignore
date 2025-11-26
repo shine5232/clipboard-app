@@ -13,3 +13,6 @@ build/ClipboardHelper/localpycs/pyimod03_ctypes.pyc
 build/ClipboardHelper/localpycs/pyimod04_pywin32.pyc
 build/ClipboardHelper/localpycs/struct.pyc
 dist/ClipboardHelper.exe
+
+# Windows 系统保留设备名
+nul
