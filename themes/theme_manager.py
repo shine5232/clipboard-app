@@ -366,7 +366,7 @@ class ThemeManager:
             """
 
     def get_list_widget_style(self):
-        """获取列表控件样式"""
+        """获取列表控件样式 - 完全隐藏滚动条"""
         if self.is_dark:
             return """
                 QListWidget {
@@ -392,29 +392,7 @@ class ThemeManager:
                     background: transparent;
                 }
                 QScrollBar:vertical {
-                    background: transparent;
-                    width: 8px;
-                    margin: 0px;
-                    border-radius: 4px;
-                }
-                QScrollBar::handle:vertical {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(102, 126, 234, 0.5),
-                        stop:1 rgba(118, 75, 162, 0.5));
-                    min-height: 30px;
-                    border-radius: 4px;
-                    margin: 2px;
-                }
-                QScrollBar::handle:vertical:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(102, 126, 234, 0.8),
-                        stop:1 rgba(118, 75, 162, 0.8));
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0px;
-                }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                    background: none;
+                    width: 0px;
                 }
             """
         else:
@@ -442,29 +420,7 @@ class ThemeManager:
                     background: transparent;
                 }
                 QScrollBar:vertical {
-                    background: transparent;
-                    width: 8px;
-                    margin: 0px;
-                    border-radius: 4px;
-                }
-                QScrollBar::handle:vertical {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(102, 126, 234, 0.3),
-                        stop:1 rgba(118, 75, 162, 0.3));
-                    min-height: 30px;
-                    border-radius: 4px;
-                    margin: 2px;
-                }
-                QScrollBar::handle:vertical:hover {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 rgba(102, 126, 234, 0.6),
-                        stop:1 rgba(118, 75, 162, 0.6));
-                }
-                QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                    height: 0px;
-                }
-                QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                    background: none;
+                    width: 0px;
                 }
             """
 

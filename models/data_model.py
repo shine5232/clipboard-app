@@ -52,8 +52,7 @@ class DataModel:
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             return True
-        except Exception as e:
-            print(f"保存数据失败: {e}")
+        except Exception:
             return False
 
     def load_clipboard_data(self):
@@ -68,8 +67,7 @@ class DataModel:
                 with open(self.data_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             return []
-        except Exception as e:
-            print(f"加载数据失败: {e}")
+        except Exception:
             return []
 
     def clear_clipboard_data(self):
@@ -83,8 +81,7 @@ class DataModel:
             if self.data_file.exists():
                 self.data_file.unlink()
             return True
-        except Exception as e:
-            print(f"清除数据文件失败: {e}")
+        except Exception:
             return False
 
     def save_settings(self, settings):
@@ -98,14 +95,10 @@ class DataModel:
             bool: 是否保存成功
         """
         try:
-            print(f"[配置保存] 保存路径: {self.settings_file}")
-            print(f"[配置保存] 保存内容: {settings}")
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
-            print(f"[配置保存] 保存成功!")
             return True
-        except Exception as e:
-            print(f"保存设置失败: {e}")
+        except Exception:
             return False
 
     def load_settings(self):
@@ -122,19 +115,12 @@ class DataModel:
         }
 
         try:
-            print(f"[配置加载] 配置文件路径: {self.settings_file}")
-            print(f"[配��加载] 文件是否存在: {self.settings_file.exists()}")
             if self.settings_file.exists():
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     loaded_settings = json.load(f)
-                    print(f"[配置加载] 加载的配置: {loaded_settings}")
                     default_settings.update(loaded_settings)
-            else:
-                print(f"[配置加载] 配置文件不存在，使用默认配置")
-            print(f"[配置加载] 最终配置: {default_settings}")
             return default_settings
-        except Exception as e:
-            print(f"加载设置失败: {e}")
+        except Exception:
             return default_settings
 
     @staticmethod

@@ -30,8 +30,7 @@ class DataManager:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception as e:
-            print(f"加载 JSON 文件失败 ({file_path}): {e}")
+        except Exception:
             return default
 
     @staticmethod
@@ -56,8 +55,7 @@ class DataManager:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=indent)
             return True
-        except Exception as e:
-            print(f"保存 JSON 文件失败 ({file_path}): {e}")
+        except Exception:
             return False
 
 

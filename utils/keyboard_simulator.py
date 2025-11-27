@@ -113,8 +113,7 @@ def simulate_paste():
         time.sleep(0.02)
         send_input_key(VK_CONTROL, up=True)
         return True
-    except Exception as e:
-        print(f"执行粘贴失败: {e}")
+    except Exception:
         return False
 
 
@@ -142,8 +141,7 @@ def simulate_key_combo(*keys, hold_time=0.02):
             time.sleep(hold_time)
 
         return True
-    except Exception as e:
-        print(f"模拟组合键失败: {e}")
+    except Exception:
         return False
 
 

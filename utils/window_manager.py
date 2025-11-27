@@ -18,8 +18,7 @@ def get_foreground_window():
         user32 = ctypes.windll.user32
         hwnd = user32.GetForegroundWindow()
         return hwnd if hwnd else None
-    except Exception as e:
-        print(f"获取前台窗口失败: {e}")
+    except Exception:
         return None
 
 
@@ -40,8 +39,7 @@ def set_foreground_window(hwnd):
         user32 = ctypes.windll.user32
         result = user32.SetForegroundWindow(hwnd)
         return bool(result)
-    except Exception as e:
-        print(f"激活窗口失败: {e}")
+    except Exception:
         return False
 
 

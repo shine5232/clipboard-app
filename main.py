@@ -8,16 +8,6 @@ import time
 import json
 import ctypes
 
-# 设置 Windows 控制台编码为 UTF-8
-if sys.platform == 'win32':
-    try:
-        import io
-        # 设置 line_buffering=True 确保每行输出都立即刷新
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
-    except:
-        pass
-
 from datetime import datetime
 from pathlib import Path
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
@@ -767,9 +757,9 @@ class ClipboardWindow(QWidget):
 
         close_btn = QPushButton('×')
         close_btn.setFixedSize(20, 20)
-        close_btn.setToolTip('隐藏窗口')
+        close_btn.setToolTip('切换胶囊模式')
         close_btn.setStyleSheet(self.theme_manager.get_header_close_button_style())
-        close_btn.clicked.connect(self.hide_window)
+        close_btn.clicked.connect(self.toggle_capsule_mode)
         layout.addWidget(close_btn)
 
         header.setLayout(layout)
@@ -1360,6 +1350,15 @@ def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName('剪贴板助手')
+    app.setApplicationDisplayName('剪贴板助手')
+
+    # 设置 Windows AppUserModelID，使通知显示正确的应用名称
+    if sys.platform == 'win32':
+        try:
+            # 设置应用程序用户模型 ID
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('剪贴板助手')
+        except:
+            pass
 
     window = ClipboardWindow()
     window.show()
