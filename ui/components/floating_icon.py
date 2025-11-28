@@ -33,11 +33,12 @@ class FloatingIcon(QWidget):
         self.is_animating = False  # 是否正在动画中
         self.allow_hover_restore = False  # 是否允许鼠标悬停恢复（防止飞出时立即触发）
         self.edge_threshold = 60  # 靠近边缘的距离阈值（像素）- 减小到60px，更不容易误触发
+        self.orientation = 'vertical'  # 胶囊方向: 'vertical' (竖向) 或 'horizontal' (横向)
 
         # 图标尺寸
         self.icon_size = 80  # 圆形图标大小
-        self.capsule_width = 8  # 胶囊宽度
-        self.capsule_height = 80  # 胶囊高度（改为80，与圆形图标相同）
+        self.capsule_width = 8  # 竖向胶囊宽度
+        self.capsule_height = 80  # 竖向胶囊高度（改为80，与圆形图标相同）
 
         self.init_ui()
 
@@ -99,6 +100,10 @@ class FloatingIcon(QWidget):
         self.is_dark = is_dark
         self.color_scheme = color_scheme
         self.update()
+
+    def set_orientation(self, orientation):
+        """设置胶囊方向 ('vertical' 或 'horizontal')"""
+        self.orientation = orientation
 
     def set_window_pixmap(self, pixmap):
         """设置主窗口截图"""
@@ -281,17 +286,23 @@ class FloatingIcon(QWidget):
             self.draw_circle_icon(painter, color1, color2)
 
     def draw_capsule(self, painter, color1, color2):
-        """绘制胶囊状态"""
+        """绘制胶囊状态 (支持横向和纵向)"""
         width = self.width()
         height = self.height()
 
         # 创建圆角矩形路径
         path = QPainterPath()
-        radius = width / 2
+        radius = min(width, height) / 2  # 使用较小的维度作为圆角半径
         path.addRoundedRect(0, 0, width, height, radius, radius)
 
-        # 渐变填充
-        gradient = QLinearGradient(0, 0, 0, height)
+        # 根据方向设置渐变
+        if self.orientation == 'horizontal':
+            # 横向胶囊: 从左到右渐变
+            gradient = QLinearGradient(0, 0, width, 0)
+        else:
+            # 纵向胶囊: 从上到下渐变
+            gradient = QLinearGradient(0, 0, 0, height)
+
         gradient.setColorAt(0, QColor(color1))
         gradient.setColorAt(1, QColor(color2))
 

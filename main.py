@@ -410,6 +410,8 @@ class ClipboardWindow(QWidget):
         self.floating_icon = None  # 浮动图标组件
         self.saved_window_pos = None  # 保存主窗口位置（用于从胶囊模式恢复）
         self.saved_window_pixmap = None  # 保存主窗口截图（用于飞入动画）
+        self.edge_snap_distance = 50  # 触发吸附的距离阈值（像素）
+        self.docked_edge = None  # 当前吸附的边缘: 'left', 'right', 'top', 'bottom'
 
         # 初始化UI
         self.init_ui()
@@ -839,11 +841,52 @@ class ClipboardWindow(QWidget):
 
     def header_mouse_move(self, event):
         if self.dragging:
-            self.move(event.globalPos() - self.drag_position)
+            new_pos = event.globalPos() - self.drag_position
+            self.move(new_pos)
+
+            # 检测是否接近屏幕边缘
+            self.check_edge_snap()
+
             event.accept()
 
     def header_mouse_release(self, event):
-        self.dragging = False
+        """鼠标释放时,如果接近边缘则自动吸附并进入胶囊模式"""
+        if self.dragging:
+            self.dragging = False
+
+            # 检查是否触发边缘吸附
+            screen = QApplication.desktop().screenGeometry()
+            window_rect = self.geometry()
+
+            edge = None
+            # 检测左边缘
+            if window_rect.left() <= self.edge_snap_distance:
+                edge = 'left'
+            # 检测右边缘
+            elif window_rect.right() >= screen.width() - self.edge_snap_distance:
+                edge = 'right'
+            # 检测顶部边缘
+            elif window_rect.top() <= self.edge_snap_distance:
+                edge = 'top'
+            # 检测底部边缘
+            elif window_rect.bottom() >= screen.height() - self.edge_snap_distance:
+                edge = 'bottom'
+
+            # 如果检测到边缘,则进入胶囊模式
+            if edge:
+                self.docked_edge = edge
+                self.enter_capsule_mode()
+            else:
+                self.docked_edge = None
+
+    def check_edge_snap(self):
+        """检测是否接近屏幕边缘(拖动时视觉提示)"""
+        screen = QApplication.desktop().screenGeometry()
+        window_rect = self.geometry()
+
+        # 检测是否接近边缘,可以在这里添加视觉反馈(如高亮边缘)
+        # 目前只在释放时触发吸附
+        pass
 
     def update_mode_label(self):
         """更新输出模式标识"""
@@ -1075,13 +1118,59 @@ class ClipboardWindow(QWidget):
         # 设置截图到浮动图标
         self.floating_icon.set_window_pixmap(self.saved_window_pixmap)
 
-        # 计算目标位置（屏幕右侧胶囊位置）
+        # 计算目标位置（根据吸附的边缘）
         from PyQt5.QtWidgets import QApplication
         from PyQt5.QtCore import QRect, QPropertyAnimation, QEasingCurve, QTimer
         screen = QApplication.desktop().screenGeometry()
 
-        capsule_x = screen.width() - self.floating_icon.capsule_width
-        capsule_y = (screen.height() - self.floating_icon.capsule_height) // 2
+        # 获取当前窗口位置，用于确定胶囊吸附位置
+        current_window_rect = self.geometry()
+
+        # 根据吸附边缘计算胶囊位置和尺寸
+        if self.docked_edge == 'left':
+            # 左边缘: 竖向胶囊，保持窗口当前的Y位置
+            self.floating_icon.set_orientation('vertical')
+            capsule_width = self.floating_icon.capsule_width
+            capsule_height = self.floating_icon.capsule_height
+            capsule_x = 0
+            # 使用当前窗口的Y位置（取窗口中心点对应的胶囊中心位置）
+            window_center_y = current_window_rect.y() + current_window_rect.height() // 2
+            capsule_y = window_center_y - capsule_height // 2
+            # 确保不超出屏幕范围
+            capsule_y = max(0, min(capsule_y, screen.height() - capsule_height))
+        elif self.docked_edge == 'top':
+            # 顶部边缘: 横向胶囊，保持窗口当前的X位置
+            self.floating_icon.set_orientation('horizontal')
+            capsule_width = self.floating_icon.capsule_height  # 横向时宽度和高度互换
+            capsule_height = self.floating_icon.capsule_width
+            # 使用当前窗口的X位置（取窗口中心点对应的胶囊中心位置）
+            window_center_x = current_window_rect.x() + current_window_rect.width() // 2
+            capsule_x = window_center_x - capsule_width // 2
+            # 确保不超出屏幕范围
+            capsule_x = max(0, min(capsule_x, screen.width() - capsule_width))
+            capsule_y = 0
+        elif self.docked_edge == 'bottom':
+            # 底部边缘: 横向胶囊，保持窗口当前的X位置
+            self.floating_icon.set_orientation('horizontal')
+            capsule_width = self.floating_icon.capsule_height  # 横向时宽度和高度互换
+            capsule_height = self.floating_icon.capsule_width
+            # 使用当前窗口的X位置（取窗口中心点对应的胶囊中心位置）
+            window_center_x = current_window_rect.x() + current_window_rect.width() // 2
+            capsule_x = window_center_x - capsule_width // 2
+            # 确保不超出屏幕范围
+            capsule_x = max(0, min(capsule_x, screen.width() - capsule_width))
+            capsule_y = screen.height() - capsule_height
+        else:  # right 或 默认
+            # 右边缘: 竖向胶囊，保持窗口当前的Y位置
+            self.floating_icon.set_orientation('vertical')
+            capsule_width = self.floating_icon.capsule_width
+            capsule_height = self.floating_icon.capsule_height
+            capsule_x = screen.width() - capsule_width
+            # 使用当前窗口的Y位置（取窗口中心点对应的胶囊中心位置）
+            window_center_y = current_window_rect.y() + current_window_rect.height() // 2
+            capsule_y = window_center_y - capsule_height // 2
+            # 确保不超出屏幕范围
+            capsule_y = max(0, min(capsule_y, screen.height() - capsule_height))
 
         # 胶囊从主窗口的大小和位置开始（显示截图，不是胶囊形状）
         start_x = self.pos().x()
@@ -1097,15 +1186,13 @@ class ClipboardWindow(QWidget):
         # 延迟隐藏主窗口，让浮动图标先显示出来
         QTimer.singleShot(50, self.hide)
 
-        # 创建缩放飞出动画（从主窗口大小缩小到胶囊大小并移动到右侧）
+        # 创建缩放飞出动画（从主窗口大小缩小到胶囊大小并移动到边缘）
         fly_animation = QPropertyAnimation(self.floating_icon, b"geometry")
         fly_animation.setDuration(500)  # 500ms缩放飞行动画
         fly_animation.setEasingCurve(QEasingCurve.InOutCubic)
 
         fly_animation.setStartValue(QRect(start_x, start_y, start_width, start_height))
-        fly_animation.setEndValue(QRect(capsule_x, capsule_y,
-                                       self.floating_icon.capsule_width,
-                                       self.floating_icon.capsule_height))
+        fly_animation.setEndValue(QRect(capsule_x, capsule_y, capsule_width, capsule_height))
 
         # 在动画80%完成时清除截图并切换为胶囊模式
         def switch_to_capsule():
