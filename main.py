@@ -610,7 +610,7 @@ class ClipboardWindow(QWidget):
         # 设置虚拟化列表委托
         self.item_delegate = ClipboardItemDelegate(self.list_widget, self.theme_manager)
         self.item_delegate.set_theme(self.theme_manager.is_dark)
-        self.item_delegate.on_item_click = self.paste_single_item
+        # 移除了on_item_click回调,只保留删除功能
         self.item_delegate.on_delete_click = self.remove_item_by_text
         self.list_widget.setItemDelegate(self.item_delegate)
 
@@ -965,29 +965,6 @@ class ClipboardWindow(QWidget):
                     self.setCursor(Qt.ArrowCursor)
 
         return super().eventFilter(obj, event)
-
-    def paste_single_item(self, text):
-        """粘贴单个项目到光标位置"""
-        if not text:
-            return
-
-        try:
-            # 使用服务层准备粘贴
-            if self.clipboard_service.prepare_single_paste(text):
-                # 隐藏窗口
-                self.hide()
-
-                # 激活前一个窗口
-                self.clipboard_service.restore_previous_window()
-
-                # 延迟400ms执行粘贴
-                QTimer.singleShot(400, self._execute_single_paste)
-        except Exception:
-            pass  # 单项粘贴失败
-
-    def _execute_single_paste(self):
-        """执行单项粘贴操作"""
-        self.clipboard_service.execute_paste()
 
     def remove_item_by_text(self, text):
         """删除指定项"""

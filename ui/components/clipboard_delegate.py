@@ -28,7 +28,6 @@ class ClipboardItemDelegate(QStyledItemDelegate):
         self.hovered_delete_index = -1  # 鼠标悬停在删除按钮上的索引
 
         # 回调函数
-        self.on_item_click = None  # 点击项目回调
         self.on_delete_click = None  # 点击删除按钮回调
 
     def set_theme(self, is_dark):
@@ -206,12 +205,6 @@ class ClipboardItemDelegate(QStyledItemDelegate):
                     if data:
                         self.on_delete_click(data.get('text', ''))
                 return True
-            else:
-                # 点击了项目本身
-                if self.on_item_click:
-                    data = index.data(Qt.UserRole)
-                    if data:
-                        self.on_item_click(data.get('text', ''))
-                return True
+            # 移除了点击项目本身的粘贴功能
 
         return super().editorEvent(event, model, option, index)

@@ -226,31 +226,6 @@ class ClipboardService(QObject):
             if self.sequential_index < 0:
                 self.sequential_index = len(self.clipboard_data) - 1
 
-    def prepare_single_paste(self, text):
-        """
-        准备单项粘贴
-
-        Args:
-            text: 要粘贴的文本
-
-        Returns:
-            bool: 是否成功准备
-        """
-        if not text:
-            return False
-
-        # 记录粘贴信息
-        self.last_pasted_text = text
-        self.last_paste_time = time.time()
-        self.paste_ignore_until = time.time() + 1.5
-
-        # 设置剪贴板
-        if set_clipboard_text(text):
-            self.last_clipboard_text = text
-            return True
-
-        return False
-
     def execute_paste(self):
         """执行粘贴操作"""
         simulate_paste()
