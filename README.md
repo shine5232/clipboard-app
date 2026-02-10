@@ -1,31 +1,33 @@
 # 剪贴板助手 📋
 
-> 一个功能强大、界面美观的 Windows 剪贴板增强工具
+> 一个功能强大、界面美观的 macOS 剪贴板增强工具
 
-[![Python Version](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)](https://pypi.org/project/PyQt5/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
 
 ---
 
 ## ✨ 核心特性
 
 ### 🎯 主要功能
-- **自动捕获** - 自动监听 Ctrl+C 复制操作，智能记录剪贴板内容
+- **自动捕获** - 自动监听 Cmd+C 复制操作，智能记录剪贴板内容
 - **批量粘贴** - 支持多种输出模式：逗号拼接、顺序输出、倒序输出
-- **胶囊模式** - 创新的交互体验，双击标题栏缩小为胶囊悬浮在屏幕右侧
+- **胶囊模式** - 创新的交互体验，拖拽到屏幕边缘自动收缩为胶囊悬浮窗
 - **快捷操作** - 全局快捷键支持，随时随地快速操作
 - **智能去重** - 自动过滤重复内容，保持列表整洁
 
 ### 🎨 界面设计
 - **精美主题** - 支持日间/暗夜模式，4 种配色方案可选
+- **自动适配** - 自动检测 macOS 系统主题（深色/浅色）
 - **流畅动画** - 丝滑的过渡动画和交互反馈
 - **现代UI** - 无边框设计、渐变效果、圆角阴影
-- **虚拟化渲染** - 即使数千条记录也能流畅滚动
+- **Retina 支持** - 完美支持高分辨率显示屏
 
 ### 🔧 系统集成
-- **系统托盘** - 最小化到托盘，不占用任务栏
-- **自定义菜单** - 精美的托盘右键菜单
+- **菜单栏图标** - 最小化到菜单栏，不占用 Dock
+- **自定义菜单** - 精美的菜单栏右键菜单
 - **单实例运行** - 防止重复启动
 - **窗口置顶** - 始终显示在最前方
 
@@ -35,14 +37,19 @@
 
 ### 环境要求
 
-- **操作系统**: Windows 7 / 8 / 10 / 11
-- **Python**: 3.14 或更高版本
-- **依赖库**: PyQt5, pynput, pywin32
+- **操作系统**: macOS 10.14 (Mojave) 或更高版本
+- **Python**: 3.9 或更高版本
+- **依赖库**: PyQt5, pynput, pyobjc
 
 ### 安装依赖
 
 ```bash
-pip install PyQt5 pynput pywin32
+pip install -r requirements.txt
+```
+
+或手动安装：
+```bash
+pip install PyQt5 pynput pyobjc-core pyobjc-framework-Cocoa pyobjc-framework-Quartz
 ```
 
 ### 运行程序
@@ -51,7 +58,16 @@ pip install PyQt5 pynput pywin32
 python main.py
 ```
 
-或者双击 `main.py` 文件运行。
+### 权限设置
+
+首次运行时，macOS 会提示需要授予以下权限：
+
+1. **辅助功能权限** - 用于全局快捷键监听
+   - 系统偏好设置 → 安全性与隐私 → 隐私 → 辅助功能
+   - 添加终端或 Python 应用
+
+2. **自动化权限** - 用于模拟键盘输入
+   - 系统会自动提示，点击"允许"即可
 
 ---
 
@@ -60,22 +76,22 @@ python main.py
 ### 基础操作
 
 #### 1. 复制内容
-- 在任意应用中使用 `Ctrl+C` 复制内容
+- 在任意应用中使用 `Cmd+C` 复制内容
 - 剪贴板助手会自动捕获并记录
 - 重复内容会自动去重
 
 #### 2. 批量粘贴
-- **方法一**: 按下全局快捷键 `Ctrl+Space`
-- **方法二**: 点击剪贴板助手窗口中的列表项
+- 按下全局快捷键 `Cmd+Ctrl+V`
 
 #### 3. 输出模式
 - **逗号拼接**: 将所有内容用逗号连接后粘贴
-- **顺序输出**: 按添加顺序依次粘贴（每次 Ctrl+Space 粘贴一条）
-- **倒序输出**: 按添加倒序依次粘贴（每次 Ctrl+Space 粘贴一条）
+- **顺序输出**: 按添加顺序依次粘贴（每次快捷键粘贴一条）
+- **倒序输出**: 按添加倒序依次粘贴（每次快捷键粘贴一条）
 
 ### 胶囊模式
 
 #### 进入胶囊模式
+- **拖拽到边缘** - 将窗口拖拽到屏幕边缘（左/右/上/下）并释放
 - **双击标题栏** - 主窗口会缩小并飞到屏幕右侧成为胶囊状悬浮窗
 - 胶囊会记住主窗口的原始位置
 
@@ -91,11 +107,11 @@ python main.py
 
 | 快捷键 | 功能 |
 |-------|------|
-| `Ctrl+Space` | 批量粘贴 |
-| `Ctrl+Shift+C` | 显示/隐藏主窗口 |
-| `Ctrl+Shift+Q` | 退出程序 |
+| `Cmd+Ctrl+V` | 批量粘贴 |
+| `Cmd+Shift+C` | 显示/隐藏主窗口 |
+| `Cmd+Shift+Q` | 退出程序 |
 
-### 系统托盘
+### 菜单栏图标
 
 - **单击图标**: 无操作
 - **双击图标**: 显示/隐藏主窗口
@@ -144,9 +160,9 @@ python main.py
 | 技术 | 用途 |
 |------|------|
 | **PyQt5** | GUI 界面框架 |
-| **win32clipboard** | 剪贴板读写（带重试机制） |
-| **pynput** | 全局快捷键监听 |
-| **ctypes** | Windows API 调用（SendInput） |
+| **QClipboard** | 剪贴板读写 |
+| **pynput** | 全局快捷键监听与键盘模拟 |
+| **pyobjc** | macOS 原生 API 调用 |
 | **json** | 数据持久化存储 |
 
 ---
@@ -156,23 +172,33 @@ python main.py
 ### 快速打包
 
 ```bash
-# 方法一：使用脚本（最简单）
-双击运行 build.bat
+# 方法一：使用脚本（推荐）
+chmod +x build_mac.sh
+./build_mac.sh
 
-# 方法二：手动打包
+# 方法二：使用 PyInstaller
 pip install pyinstaller
-pyinstaller --name=ClipboardHelper --onefile --windowed main.py
+pyinstaller --name="剪贴板助手" --windowed --onefile main.py
+
+# 方法三：使用 py2app（生成 .app 包）
+pip install py2app
+python setup.py py2app
 ```
 
 ### 打包结果
 
-打包后文件位置：`dist\ClipboardHelper.exe`
+- **PyInstaller**: `dist/剪贴板助手` (可执行文件)
+- **py2app**: `dist/剪贴板助手.app` (macOS 应用包)
 
 **文件说明**：
-- 大小：约 30-50 MB
-- 类型：单文件可执行程序
+- 类型：macOS 应用程序
 - 依赖：无需 Python 环境
-- 分发：仅需这一个 exe 文件
+- 分发：仅需应用程序文件
+
+### 注意事项
+
+1. 首次运行需要在"系统偏好设置 → 安全性与隐私"中允许运行
+2. 需要授予辅助功能权限才能使用全局快捷键
 
 ---
 
@@ -182,7 +208,9 @@ pyinstaller --name=ClipboardHelper --onefile --windowed main.py
 PyQt5>=5.15.0
 pynput>=1.7.6
 pyperclip>=1.8.2
-pywin32>=311
+pyobjc-core>=9.0
+pyobjc-framework-Cocoa>=9.0
+pyobjc-framework-Quartz>=9.0
 PyInstaller>=6.0.0
 ```
 
@@ -190,141 +218,6 @@ PyInstaller>=6.0.0
 ```bash
 pip install -r requirements.txt
 ```
-
----
-
-## ⚙️ 配置说明
-
-### 数据存储
-
-程序会自动保存数据到 `data` 目录：
-
-**剪贴板数据**：`data/clipboard_data.json`
-```json
-[
-  {
-    "text": "复制的文本内容",
-    "timestamp": "12:30:45"
-  }
-]
-```
-
-**用户设置**：`data/settings.json`
-```json
-{
-  "output_mode": "comma",
-  "theme": "light"
-}
-```
-
-### 自定义配置
-
-可修改 `main.py` 中的参数：
-
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| 窗口大小 | `(360, 560)` | 宽度 × 高度 |
-| 窗口位置 | 右下角 | 屏幕坐标 |
-| 轮询间隔 | `300ms` | 剪贴板检查频率 |
-| 粘贴分隔符 | `,` | 逗号拼接模式的分隔符 |
-| 忽略时间 | `1.5s` | 粘贴后忽略剪贴板变化的时间 |
-
----
-
-## ❓ 常见问题 FAQ
-
-### Q1: 三种输出模式有什么区别？
-
-**A**:
-- **逗号拼接**：所有内容用逗号连接，一次性粘贴
-- **顺序输出**：从第一条开始，每次粘贴一条（FIFO）
-- **倒序输出**：从最后一条开始，每次粘贴一条（LIFO）
-
-### Q2: 如何切换主题？
-
-**A**: 点击设置按钮（齿轮图标）→ 选择"系统主题" → 选择"日间模式"或"暗夜模式" → 点击"应用"或"确定"
-
-### Q3: 快捷键 Ctrl+Space 不生效？
-
-**A**: 可能的原因：
-1. 程序未运行（检查托盘图标）
-2. 与输入法冲突（某些输入法占用此快捷键）
-3. 剪贴板列表为空
-
-### Q4: 如何设置开机自启动？
-
-**A**:
-1. 右键 `ClipboardHelper.exe` → 创建快捷方式
-2. 按 `Win+R` 输入 `shell:startup` → 回车
-3. 将快捷方式复制到启动文件夹
-
-### Q5: 顺序输出和倒序输出会删除记录吗？
-
-**A**: 不会！两种模式都不会删除记录，只是改变输出顺序。输出完所有记录后会循环重新开始。
-
-### Q6: 切换输出模式后索引会重置吗？
-
-**A**: 是的！切换模式后会自动重置到相应的起始位置：
-- 顺序输出：重置到第一条
-- 倒序输出：重置到最后一条
-
-### Q7: 数据会自动保存吗？
-
-**A**: 是的！每次添加或删除内容都会自动保存，设置也会实时保存，重启程序后自动恢复。
-
----
-
-## 🐛 已知问题与限制
-
-### 已知问题
-
-1. **快捷键冲突**
-   - 现象：Ctrl+Space 可能与输入法冲突
-   - 解决：修改代码中的快捷键组合
-
-2. **粘贴延迟**
-   - 现象：粘贴有约 250ms 延迟
-   - 原因：等待剪贴板更新和用户释放按键
-   - 影响：轻微，确保粘贴成功
-
-### 限制说明
-
-- ✅ 仅支持纯文本（不支持图片、文件）
-- ✅ Windows 平台专用
-- ✅ 需要管理员权限注册全局快捷键
-
----
-
-## 🔄 更新日志
-
-### v1.0.0 (2025-11-23) - 正式版
-
-#### ✨ 新增功能
-- ✅ 三种输出模式（逗号拼接、顺序输出、倒序输出）
-- ✅ 模式标识显示（拼/顺/倒）
-- ✅ 主题切换功能（日间/暗夜模式）
-- ✅ 完整的设置对话框
-- ✅ 自动收集剪贴板内容
-- ✅ 批量粘贴功能（自动模拟 Ctrl+V）
-- ✅ 精美的渐变色悬浮窗界面
-- ✅ 系统托盘支持
-- ✅ 数据持久化存储
-- ✅ 全局快捷键支持
-
-#### 🚀 优化改进
-- ✅ 剪贴板访问增加 3 次重试机制
-- ✅ 智能通知（仅在窗口隐藏时显示）
-- ✅ 切换模式自动重置索引
-- ✅ 主题实时应用到所有界面元素
-- ✅ 优化粘贴时间窗口逻辑（1.5s 忽略 + 3s 比对）
-- ✅ 移除折叠功能，简化界面
-
-#### 🎨 界面改进
-- ✅ 现代化设置对话框
-- ✅ 统一的渐变色设计
-- ✅ 暗夜模式完整支持
-- ✅ 模式标识实时更新
-- ✅ 阴影效果和圆角设计
 
 ---
 
@@ -342,16 +235,16 @@ pip install -r requirements.txt
 
 2. **顺序输出模式**
    ```
-   第一次 Ctrl+Space: apple
-   第二次 Ctrl+Space: banana
-   第三次 Ctrl+Space: cherry
+   第一次 Cmd+Ctrl+V: apple
+   第二次 Cmd+Ctrl+V: banana
+   第三次 Cmd+Ctrl+V: cherry
    ```
 
 3. **倒序输出模式**
    ```
-   第一次 Ctrl+Space: cherry
-   第二次 Ctrl+Space: banana
-   第三次 Ctrl+Space: apple
+   第一次 Cmd+Ctrl+V: cherry
+   第二次 Cmd+Ctrl+V: banana
+   第三次 Cmd+Ctrl+V: apple
    ```
 
 ### 主题设置
@@ -359,6 +252,7 @@ pip install -r requirements.txt
 #### 系统主题
 - **日间模式**: 明亮清新的浅色主题
 - **暗夜模式**: 护眼舒适的深色主题
+- **自动检测**: 默认跟随 macOS 系统主题
 
 #### 配色方案
 - **魅力蓝** (blue_gradient): 蓝紫渐变，神秘优雅
@@ -370,7 +264,7 @@ pip install -r requirements.txt
 
 应用数据存储在用户目录：
 ```
-C:\Users\<用户名>\AppData\Roaming\ClipboardHelper\
+~/Library/Application Support/ClipboardHelper/
 ├── clipboard_data.json    # 剪贴板数据（临时，退出时清除）
 └── settings.json          # 用户设置（持久保存）
 ```
@@ -382,7 +276,7 @@ C:\Users\<用户名>\AppData\Roaming\ClipboardHelper\
 ## 🏗️ 项目结构
 
 ```
-clipboard-app/
+clipboard-app-mac/
 ├── main.py                 # 应用入口
 ├── models/                 # 数据模型层
 │   └── data_model.py
@@ -400,11 +294,11 @@ clipboard-app/
 │   └── window_manager.py
 ├── themes/                 # 主题管理
 │   └── theme_manager.py
-├── README.md              # 项目说明（本文档）
-└── ARCHITECTURE.md        # 架构文档
+├── setup.py               # py2app 打包配置
+├── build_mac.sh           # 打包脚本
+├── requirements.txt       # 依赖列表
+└── README.md              # 项目说明（本文档）
 ```
-
-详细架构说明请参考 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ---
 
@@ -414,9 +308,9 @@ clipboard-app/
 
 - **GUI 框架**: PyQt5
 - **动画引擎**: QPropertyAnimation
-- **剪贴板**: Windows Clipboard API
+- **剪贴板**: Qt QClipboard
 - **快捷键**: pynput
-- **窗口管理**: pywin32
+- **窗口管理**: pyobjc (AppKit)
 
 ### 架构设计
 
@@ -428,36 +322,78 @@ clipboard-app/
 
 ---
 
-## 🐛 常见问题
+## ❓ 常见问题 FAQ
 
-### Q: 剪贴板监听不工作？
-**A**: 确保程序以管理员权限运行，或者检查是否有其他程序占用剪贴板。
+### Q1: 三种输出模式有什么区别？
 
-### Q: 快捷键冲突？
-**A**: 当前版本快捷键固定，如有冲突请关闭冲突的应用或联系开发者。
+**A**:
+- **逗号拼接**：所有内容用逗号连接，一次性粘贴
+- **顺序输出**：从第一条开始，每次粘贴一条（FIFO）
+- **倒序输出**：从最后一条开始，每次粘贴一条（LIFO）
 
-### Q: 动画卡顿？
-**A**: 尝试关闭其他占用 GPU 的程序，或在任务管理器中提高程序优先级。
+### Q2: 如何切换主题？
 
-### Q: 数据丢失？
-**A**: 剪贴板数据在退出时会自动清除，这是出于隐私保护的设计。如需保留数据，可以在源码中修改 `do_quit_app` 方法。
+**A**: 点击设置按钮（齿轮图标）→ 选择"系统主题" → 选择"日间模式"或"暗夜模式" → 点击"应用"或"确定"
 
-### Q: 程序启动提示已在运行？
-**A**: 检查系统托盘是否已有程序图标，或使用任务管理器结束 Python 进程。
+### Q3: 快捷键不生效？
+
+**A**: 可能的原因：
+1. 程序未运行（检查菜单栏图标）
+2. 未授予辅助功能权限（系统偏好设置 → 安全性与隐私 → 隐私 → 辅助功能）
+3. 与其他应用快捷键冲突
+4. 剪贴板列表为空
+
+### Q4: 如何设置开机自启动？
+
+**A**:
+1. 系统偏好设置 → 用户与群组 → 登录项
+2. 点击 "+" 添加剪贴板助手应用
+
+### Q5: 程序启动提示已在运行？
+
+**A**: 检查菜单栏是否已有程序图标，或使用活动监视器结束 Python 进程。
+
+### Q6: Gatekeeper 阻止运行？
+
+**A**: 如果提示"无法打开应用，因为无法验证开发者"：
+1. 系统偏好设置 → 安全性与隐私 → 通用
+2. 点击"仍然允许"
+
+---
+
+## 🐛 已知问题与限制
+
+### 已知问题
+
+1. **需要辅助功能权限**
+   - 现象：全局快捷键不工作
+   - 解决：在系统偏好设置中授予权限
+
+2. **粘贴延迟**
+   - 现象：粘贴有约 250ms 延迟
+   - 原因：等待剪贴板更新和用户释放按键
+   - 影响：轻微，确保粘贴成功
+
+### 限制说明
+
+- ✅ 仅支持纯文本（不支持图片、文件）
+- ✅ macOS 平台专用
+- ✅ 需要辅助功能权限
 
 ---
 
 ## 📝 版本历史
 
-### v1.0.0 (2025-11-27)
-- ✨ 首次发布
+### v1.0.0-mac (2025-02)
+- 🍎 macOS 版本首次发布
 - ✅ 完整的剪贴板管理功能
-- ✅ 胶囊模式（双击标题栏缩小飞出，鼠标悬停恢复）
+- ✅ 胶囊模式（边缘吸附/双击标题栏）
 - ✅ 主题系统（日间/暗夜模式 + 4种配色）
-- ✅ 全局快捷键
-- ✅ 系统托盘集成
-- ✅ 虚拟化列表渲染
-- ✅ 流畅的缩放动画
+- ✅ 自动检测 macOS 系统主题
+- ✅ 全局快捷键 (Cmd+Ctrl+V, Cmd+Shift+C, Cmd+Shift+Q)
+- ✅ 菜单栏集成
+- ✅ Retina 显示屏支持
+- ✅ 使用 pyobjc 进行原生 macOS API 调用
 
 ---
 
@@ -504,12 +440,12 @@ clipboard-app/
 
 - [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) - 强大的 Python GUI 框架
 - [pynput](https://github.com/moses-palmer/pynput) - 全局快捷键监听
-- [pywin32](https://github.com/mhammond/pywin32) - Windows API 支持
+- [pyobjc](https://github.com/ronaldoussoren/pyobjc) - macOS 原生 API 支持
 
 ---
 
 <p align="center">
-  Made with ❤️ by LZ
+  Made with ❤️ for macOS
 </p>
 
 <p align="center">

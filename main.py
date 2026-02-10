@@ -1,17 +1,12 @@
 """
-多选剪贴板助手 - macOS/跨平台版本
-支持 Ctrl+C (macOS: Cmd+C) 自动添加，批量粘贴（逗号分隔）
+多选剪贴板助手 - macOS 版
+支持 Cmd+C 自动添加，批量粘贴（逗号分隔）
 """
 
 import sys
 import time
 import json
-import platform
 import socket
-
-# 判断当前平台
-IS_MACOS = platform.system() == 'Darwin'
-IS_WINDOWS = platform.system() == 'Windows'
 
 from datetime import datetime
 from pathlib import Path
@@ -551,22 +546,12 @@ class ClipboardWindow(QWidget):
             def on_quit_hotkey():
                 self.quit_app_signal.emit()
 
-            # 根据平台选择快捷键
-            if IS_MACOS:
-                # macOS: 使用 Cmd 键
-                # 注意: Cmd+Space 与 Spotlight 冲突，使用 Cmd+Ctrl+V
-                hotkeys = {
-                    '<cmd>+<ctrl>+v': on_paste_hotkey,      # Cmd+Ctrl+V 粘贴
-                    '<cmd>+<shift>+c': on_toggle_hotkey,    # Cmd+Shift+C 显示/隐藏
-                    '<cmd>+<shift>+q': on_quit_hotkey       # Cmd+Shift+Q 退出
-                }
-            else:
-                # Windows/Linux: 使用 Ctrl 键
-                hotkeys = {
-                    '<ctrl>+<space>': on_paste_hotkey,
-                    '<ctrl>+<shift>+c': on_toggle_hotkey,
-                    '<ctrl>+<shift>+q': on_quit_hotkey
-                }
+            # macOS 快捷键配置
+            hotkeys = {
+                '<cmd>+<ctrl>+v': on_paste_hotkey,      # Cmd+Ctrl+V 粘贴
+                '<cmd>+<shift>+c': on_toggle_hotkey,    # Cmd+Shift+C 显示/隐藏
+                '<cmd>+<shift>+q': on_quit_hotkey       # Cmd+Shift+Q 退出
+            }
 
             self.hotkey_listener = GlobalHotKeys(hotkeys)
             self.hotkey_listener.start()
@@ -846,12 +831,8 @@ class ClipboardWindow(QWidget):
         self.tray_icon.activated.connect(self.tray_icon_activated)
         self.tray_icon.show()
 
-        # 根据平台显示不同的快捷键提示
-        if IS_MACOS:
-            tooltip = '剪贴板助手\nCmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
-        else:
-            tooltip = '剪贴板助手\nCtrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出'
-        self.tray_icon.setToolTip(tooltip)
+        # 设置快捷键提示
+        self.tray_icon.setToolTip('剪贴板助手\nCmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出')
 
     def init_context_menu(self):
         """初始化主窗口右键菜单"""
@@ -1436,26 +1417,13 @@ def check_single_instance():
         return sock  # 返回 socket 对象保持引用
     except socket.error:
         # 端口已被占用，说明已有实例运行
-        if IS_MACOS:
-            # macOS: 使用 PyQt5 对话框
-            from PyQt5.QtWidgets import QMessageBox
-            app = QApplication(sys.argv)
-            QMessageBox.information(
-                None,
-                '提示',
-                '剪贴板助手已经在运行中！\n\n请在菜单栏查看图标。'
-            )
-        elif IS_WINDOWS:
-            # Windows: 使用原生 MessageBox
-            try:
-                import ctypes
-                MessageBox = ctypes.windll.user32.MessageBoxW
-                MessageBox(None,
-                          "剪贴板助手已经在运行中！\n\n请在系统托盘查看图标，或使用快捷键 Ctrl+Shift+C 显示窗口。",
-                          "提示",
-                          0x40 | 0x0)  # MB_ICONINFORMATION | MB_OK
-            except:
-                pass
+        from PyQt5.QtWidgets import QMessageBox
+        app = QApplication(sys.argv)
+        QMessageBox.information(
+            None,
+            '提示',
+            '剪贴板助手已经在运行中！\n\n请在菜单栏查看图标。'
+        )
         return None
 
 
@@ -1475,23 +1443,12 @@ def main():
     app.setApplicationName('剪贴板助手')
     app.setApplicationDisplayName('剪贴板助手')
 
-    # 设置应用程序 ID（平台特定）
-    if IS_WINDOWS:
-        try:
-            import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('剪贴板助手')
-        except:
-            pass
-
     window = ClipboardWindow()
     window.show()
 
-    # 根据平台显示不同的快捷键提示
+    # 显示快捷键提示
     if hasattr(window, 'tray_icon') and window.tray_icon:
-        if IS_MACOS:
-            tip_message = 'Cmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
-        else:
-            tip_message = 'Ctrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出'
+        tip_message = 'Cmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
 
         window.tray_icon.showMessage(
             '剪贴板助手已启动',
