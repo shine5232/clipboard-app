@@ -1,11 +1,11 @@
 """
-剪贴板工具模块
-提供剪贴板读写和文本处理功能
+剪贴板工具模块 - macOS/跨平台版本
+使用 PyQt5 QClipboard 进行剪贴板操作
 """
 
 import time
-import win32clipboard
-import win32con
+import platform
+from PyQt5.QtWidgets import QApplication
 
 
 def get_clipboard_text():
@@ -20,13 +20,10 @@ def get_clipboard_text():
 
     for attempt in range(max_retries):
         try:
-            win32clipboard.OpenClipboard()
-            try:
-                if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
-                    data = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-                    return data
-            finally:
-                win32clipboard.CloseClipboard()
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                text = clipboard.text()
+                return text if text else None
             return None
         except Exception:
             if attempt < max_retries - 1:
@@ -49,13 +46,11 @@ def set_clipboard_text(text):
 
     for attempt in range(max_retries):
         try:
-            win32clipboard.OpenClipboard()
-            try:
-                win32clipboard.EmptyClipboard()
-                win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
-            finally:
-                win32clipboard.CloseClipboard()
-            return True
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                clipboard.setText(text if text else '')
+                return True
+            return False
         except Exception:
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)

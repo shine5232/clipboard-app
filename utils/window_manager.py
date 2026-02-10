@@ -1,44 +1,67 @@
 """
-窗口管理模块
-提供 Windows 窗口焦点管理功能
+窗口管理模块 - macOS/跨平台版本
+使用 pyobjc 访问 macOS 窗口 API
 """
 
-import ctypes
 import time
+import platform
+
+# 判断当前平台
+IS_MACOS = platform.system() == 'Darwin'
+
+# 尝试导入 macOS 专用模块
+HAS_MACOS_API = False
+if IS_MACOS:
+    try:
+        from AppKit import NSWorkspace, NSRunningApplication
+        from AppKit import NSApplicationActivateIgnoringOtherApps
+        HAS_MACOS_API = True
+    except ImportError:
+        pass
 
 
 def get_foreground_window():
     """
-    获取当前活动窗口的句柄
+    获取当前活动窗口/应用程序
 
     Returns:
-        int: 窗口句柄，失败返回 None
+        macOS: NSRunningApplication 对象
+        其他平台: None
     """
+    if not IS_MACOS:
+        return None
+
+    if not HAS_MACOS_API:
+        return None
+
     try:
-        user32 = ctypes.windll.user32
-        hwnd = user32.GetForegroundWindow()
-        return hwnd if hwnd else None
+        workspace = NSWorkspace.sharedWorkspace()
+        active_app = workspace.frontmostApplication()
+        return active_app
     except Exception:
         return None
 
 
-def set_foreground_window(hwnd):
+def set_foreground_window(app):
     """
-    激活指定窗口
+    激活指定应用程序
 
     Args:
-        hwnd (int): 窗口句柄
+        app: NSRunningApplication 对象 (macOS)
 
     Returns:
-        bool: 成功返回 True，失败返回 False
+        bool: 是否成功
     """
-    try:
-        if not hwnd:
-            return False
+    if not IS_MACOS:
+        return False
 
-        user32 = ctypes.windll.user32
-        result = user32.SetForegroundWindow(hwnd)
-        return bool(result)
+    if not HAS_MACOS_API or not app:
+        return False
+
+    try:
+        # 激活应用程序
+        app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
+        return True
     except Exception:
         return False
 
@@ -54,7 +77,7 @@ class WindowFocusManager:
 
     def save_current_window(self):
         """
-        保存当前活动窗口
+        保存当前活动窗口/应用
 
         Returns:
             bool: 成功返回 True，失败返回 False
@@ -84,9 +107,9 @@ class WindowFocusManager:
 
     def get_previous_window(self):
         """
-        获取之前保存的窗口句柄
+        获取之前保存的窗口/应用
 
         Returns:
-            int: 窗口句柄
+            macOS: NSRunningApplication 对象
         """
         return self.previous_window

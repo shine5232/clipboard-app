@@ -1,13 +1,18 @@
 """
-数据模型层
+数据模型层 - macOS/跨平台版本
 处理数据的持久化存储和读取
 """
 
 import json
-import winreg
 import os
+import platform
+import subprocess
 from pathlib import Path
 from PyQt5.QtCore import QObject
+
+# 判断当前平台
+IS_MACOS = platform.system() == 'Darwin'
+IS_WINDOWS = platform.system() == 'Windows'
 
 
 class DataModel:
@@ -21,13 +26,7 @@ class DataModel:
             data_dir: 数据目录路径（可选）
         """
         if data_dir is None:
-            # 使用用户 AppData 目录，确保打包后也能正常读写
-            appdata_dir = os.getenv('APPDATA')  # 获取 C:\Users\用户名\AppData\Roaming
-            if appdata_dir:
-                data_dir = Path(appdata_dir) / 'ClipboardHelper'
-            else:
-                # 如果获取不到 AppData，使用用户主目录
-                data_dir = Path.home() / '.clipboard_helper'
+            data_dir = self._get_default_data_dir()
         else:
             data_dir = Path(data_dir)
 
@@ -37,6 +36,27 @@ class DataModel:
 
         # 确保目录存在
         self.data_dir.mkdir(parents=True, exist_ok=True)
+
+    def _get_default_data_dir(self):
+        """
+        获取默认数据目录
+
+        Returns:
+            Path: 数据目录路径
+        """
+        if IS_MACOS:
+            # macOS: ~/Library/Application Support/ClipboardHelper
+            return Path.home() / 'Library' / 'Application Support' / 'ClipboardHelper'
+        elif IS_WINDOWS:
+            # Windows: %APPDATA%/ClipboardHelper
+            appdata_dir = os.getenv('APPDATA')
+            if appdata_dir:
+                return Path(appdata_dir) / 'ClipboardHelper'
+            else:
+                return Path.home() / '.clipboard_helper'
+        else:
+            # Linux: ~/.config/ClipboardHelper
+            return Path.home() / '.config' / 'ClipboardHelper'
 
     def save_clipboard_data(self, data):
         """
@@ -126,12 +146,49 @@ class DataModel:
     @staticmethod
     def detect_system_theme():
         """
+        检测系统主题
+
+        Returns:
+            str: 'light' 或 'dark'
+        """
+        if IS_MACOS:
+            return DataModel._detect_macos_theme()
+        elif IS_WINDOWS:
+            return DataModel._detect_windows_theme()
+        else:
+            return 'light'  # Linux 默认浅色
+
+    @staticmethod
+    def _detect_macos_theme():
+        """
+        检测 macOS 系统主题
+
+        Returns:
+            str: 'light' 或 'dark'
+        """
+        try:
+            result = subprocess.run(
+                ['defaults', 'read', '-g', 'AppleInterfaceStyle'],
+                capture_output=True,
+                text=True
+            )
+            # 如果返回 "Dark"，则为深色模式
+            if result.returncode == 0 and 'Dark' in result.stdout:
+                return 'dark'
+            return 'light'
+        except Exception:
+            return 'light'
+
+    @staticmethod
+    def _detect_windows_theme():
+        """
         检测 Windows 系统主题
 
         Returns:
             str: 'light' 或 'dark'
         """
         try:
+            import winreg
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"

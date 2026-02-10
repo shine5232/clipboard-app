@@ -1,12 +1,17 @@
 """
-多选剪贴板助手 - Windows 桌面版
-支持 Ctrl+C 自动添加，批量粘贴（逗号分隔）
+多选剪贴板助手 - macOS/跨平台版本
+支持 Ctrl+C (macOS: Cmd+C) 自动添加，批量粘贴（逗号分隔）
 """
 
 import sys
 import time
 import json
-import ctypes
+import platform
+import socket
+
+# 判断当前平台
+IS_MACOS = platform.system() == 'Darwin'
+IS_WINDOWS = platform.system() == 'Windows'
 
 from datetime import datetime
 from pathlib import Path
@@ -444,24 +449,27 @@ class ClipboardWindow(QWidget):
         # 更新模式标识
         self.update_mode_label()
 
+        # 初始化主窗口右键菜单
+        self.init_context_menu()
+
     def register_clipboard_listener(self):
-        """注册 Windows 剪贴板监听器"""
+        """注册剪贴板监听器（跨平台）"""
         self.clipboard_service.last_clipboard_text = get_clipboard_text() or ""
 
-        # 使用 Windows API 监听剪贴板变化
+        # 使用跨平台的 Qt 剪贴板监听器
         self.clipboard_listener = ClipboardListener()
         self.clipboard_listener.clipboard_changed.connect(self.on_clipboard_update)
 
         if self.clipboard_listener.start():
-            pass  # 剪贴板监听器已启动（使用 Windows API）
+            pass  # 剪贴板监听器已启动
         else:
-            # 如果 API 监听失败，回退到轮询方式
+            # 如果监听失败，回退到轮询方式
             self.clipboard_check_timer = QTimer()
             self.clipboard_check_timer.timeout.connect(self.check_clipboard_change)
             self.clipboard_check_timer.start(300)
 
     def on_clipboard_update(self):
-        """Windows API 触发的剪贴板更新事件"""
+        """剪贴板更新事件（跨平台）"""
         current_time = time.time()
 
         # 如果在忽略时间内，跳过
@@ -529,7 +537,7 @@ class ClipboardWindow(QWidget):
             pass  # 处理剪贴板变化失败
 
     def register_hotkeys(self):
-        """注册全局快捷键"""
+        """注册全局快捷键（跨平台）"""
         try:
             from pynput.keyboard import GlobalHotKeys
 
@@ -543,11 +551,24 @@ class ClipboardWindow(QWidget):
             def on_quit_hotkey():
                 self.quit_app_signal.emit()
 
-            self.hotkey_listener = GlobalHotKeys({
-                '<ctrl>+<space>': on_paste_hotkey,
-                '<ctrl>+<shift>+c': on_toggle_hotkey,
-                '<ctrl>+<shift>+q': on_quit_hotkey
-            })
+            # 根据平台选择快捷键
+            if IS_MACOS:
+                # macOS: 使用 Cmd 键
+                # 注意: Cmd+Space 与 Spotlight 冲突，使用 Cmd+Ctrl+V
+                hotkeys = {
+                    '<cmd>+<ctrl>+v': on_paste_hotkey,      # Cmd+Ctrl+V 粘贴
+                    '<cmd>+<shift>+c': on_toggle_hotkey,    # Cmd+Shift+C 显示/隐藏
+                    '<cmd>+<shift>+q': on_quit_hotkey       # Cmd+Shift+Q 退出
+                }
+            else:
+                # Windows/Linux: 使用 Ctrl 键
+                hotkeys = {
+                    '<ctrl>+<space>': on_paste_hotkey,
+                    '<ctrl>+<shift>+c': on_toggle_hotkey,
+                    '<ctrl>+<shift>+q': on_quit_hotkey
+                }
+
+            self.hotkey_listener = GlobalHotKeys(hotkeys)
             self.hotkey_listener.start()
         except Exception:
             pass  # 快捷键注册失败
@@ -824,7 +845,30 @@ class ClipboardWindow(QWidget):
         # 不使用系统默认菜单，改用自定义菜单
         self.tray_icon.activated.connect(self.tray_icon_activated)
         self.tray_icon.show()
-        self.tray_icon.setToolTip('剪贴板助手\nCtrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出')
+
+        # 根据平台显示不同的快捷键提示
+        if IS_MACOS:
+            tooltip = '剪贴板助手\nCmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
+        else:
+            tooltip = '剪贴板助手\nCtrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出'
+        self.tray_icon.setToolTip(tooltip)
+
+    def init_context_menu(self):
+        """初始化主窗口右键菜单"""
+        self.context_menu = TrayMenu()
+        self.context_menu.show_window_clicked.connect(self.show_window)
+        self.context_menu.quit_clicked.connect(self.do_quit_app)
+
+        # 设置主题
+        is_dark = self.settings.get('theme') == 'dark'
+        color_scheme = self.settings.get('color_scheme', 'pure_blue')
+        self.context_menu.set_theme(is_dark, color_scheme)
+
+    def contextMenuEvent(self, event):
+        """右键菜单事件"""
+        # 在鼠标位置显示菜单
+        self.context_menu.show_at_cursor()
+        event.accept()
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.DoubleClick:
@@ -1330,6 +1374,10 @@ class ClipboardWindow(QWidget):
         if hasattr(self, 'tray_menu'):
             self.tray_menu.set_theme(is_dark, color_scheme)
 
+        # 更新右键菜单主题
+        if hasattr(self, 'context_menu'):
+            self.context_menu.set_theme(is_dark, color_scheme)
+
     def update_theme_style(self, is_dark=False, color_scheme='pure_blue'):
         """更新主题样式"""
         # 更新主题管理器
@@ -1377,49 +1425,60 @@ class ClipboardWindow(QWidget):
 
 
 def check_single_instance():
-    """检查是否已有实例运行（Windows平台）"""
-    if sys.platform != 'win32':
-        return True
-
+    """检查是否已有实例运行（跨平台）"""
     try:
-        # 使用Windows互斥量确保只有一个实例运行
-        # CreateMutexW: 创建或打开一个命名互斥量
-        kernel32 = ctypes.windll.kernel32
-        mutex_name = "Global\\ClipboardHelperMutex_UniqueID_20231124"
+        # 使用端口绑定方式检测（跨平台）
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('127.0.0.1', 47632))  # 使用固定端口
 
-        # 创建互斥量
-        mutex = kernel32.CreateMutexW(None, False, mutex_name)
-        last_error = kernel32.GetLastError()
-
-        # ERROR_ALREADY_EXISTS = 183 表示互斥量已存在（程序已在运行）
-        if last_error == 183:
-            # 显示提示消息
-            MessageBox = ctypes.windll.user32.MessageBoxW
-            MessageBox(None,
-                      "剪贴板助手已经在运行中！\n\n请在系统托盘查看图标，或使用快捷键 Ctrl+Shift+C 显示窗口。",
-                      "提示",
-                      0x40 | 0x0)  # MB_ICONINFORMATION | MB_OK
-            return False
-
-        return True
-    except Exception:
-        return True  # 出错时允许启动
+        # 不关闭 socket，保持绑定状态
+        return sock  # 返回 socket 对象保持引用
+    except socket.error:
+        # 端口已被占用，说明已有实例运行
+        if IS_MACOS:
+            # macOS: 使用 PyQt5 对话框
+            from PyQt5.QtWidgets import QMessageBox
+            app = QApplication(sys.argv)
+            QMessageBox.information(
+                None,
+                '提示',
+                '剪贴板助手已经在运行中！\n\n请在菜单栏查看图标。'
+            )
+        elif IS_WINDOWS:
+            # Windows: 使用原生 MessageBox
+            try:
+                import ctypes
+                MessageBox = ctypes.windll.user32.MessageBoxW
+                MessageBox(None,
+                          "剪贴板助手已经在运行中！\n\n请在系统托盘查看图标，或使用快捷键 Ctrl+Shift+C 显示窗口。",
+                          "提示",
+                          0x40 | 0x0)  # MB_ICONINFORMATION | MB_OK
+            except:
+                pass
+        return None
 
 
 def main():
     # 检查是否已有实例在运行
-    if not check_single_instance():
+    instance_lock = check_single_instance()
+    if not instance_lock:
         sys.exit(0)
+
+    # 启用高 DPI 支持（跨平台）
+    from PyQt5.QtCore import Qt
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName('剪贴板助手')
     app.setApplicationDisplayName('剪贴板助手')
 
-    # 设置 Windows AppUserModelID，使通知显示正确的应用名称
-    if sys.platform == 'win32':
+    # 设置应用程序 ID（平台特定）
+    if IS_WINDOWS:
         try:
-            # 设置应用程序用户模型 ID
+            import ctypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('剪贴板助手')
         except:
             pass
@@ -1427,10 +1486,16 @@ def main():
     window = ClipboardWindow()
     window.show()
 
+    # 根据平台显示不同的快捷键提示
     if hasattr(window, 'tray_icon') and window.tray_icon:
+        if IS_MACOS:
+            tip_message = 'Cmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
+        else:
+            tip_message = 'Ctrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出'
+
         window.tray_icon.showMessage(
             '剪贴板助手已启动',
-            'Ctrl+Shift+C: 显示/隐藏\nCtrl+Space: 批量粘贴\nCtrl+Shift+Q: 退出',
+            tip_message,
             QSystemTrayIcon.Information,
             3000
         )

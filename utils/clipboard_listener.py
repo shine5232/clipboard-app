@@ -1,34 +1,16 @@
 """
-Windows 剪贴板监听器
-使用 AddClipboardFormatListener API 替代轮询
+剪贴板监听器 - macOS/跨平台版本
+使用 PyQt5 QClipboard 的 dataChanged 信号
 """
 
-import ctypes
-from ctypes import wintypes
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QObject, pyqtSignal
 
 
-# Windows API 常量
-WM_CLIPBOARDUPDATE = 0x031D
-
-# 加载 Windows API
-user32 = ctypes.windll.user32
-
-# 定义函数签名
-AddClipboardFormatListener = user32.AddClipboardFormatListener
-AddClipboardFormatListener.argtypes = [wintypes.HWND]
-AddClipboardFormatListener.restype = wintypes.BOOL
-
-RemoveClipboardFormatListener = user32.RemoveClipboardFormatListener
-RemoveClipboardFormatListener.argtypes = [wintypes.HWND]
-RemoveClipboardFormatListener.restype = wintypes.BOOL
-
-
-class ClipboardListener(QWidget):
+class ClipboardListener(QObject):
     """
-    剪贴板监听器
-    使用 Windows AddClipboardFormatListener API 监听剪贴板变化
+    剪贴板监听器 - 跨平台版本
+    使用 Qt 的剪贴板变化信号
     """
 
     # 剪贴板变化信号
@@ -36,61 +18,56 @@ class ClipboardListener(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
-        # 设置为完全隐藏的窗口
-        self.setWindowFlags(
-            Qt.Tool |
-            Qt.FramelessWindowHint |
-            Qt.WindowTransparentForInput
-        )
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setFixedSize(1, 1)
-        self.move(-100, -100)  # 移到屏幕外
-
-        self._registered = False
+        self._running = False
+        self._clipboard = None
+        self._last_text = None  # 用于去重
 
     def start(self):
         """开始监听剪贴板"""
-        if self._registered:
+        if self._running:
             return True
 
-        # 显示窗口以获取有效的窗口句柄
-        self.show()
-
-        # 获取窗口句柄
-        hwnd = int(self.winId())
-
-        # 注册剪贴板监听器
-        result = AddClipboardFormatListener(hwnd)
-        if result:
-            self._registered = True
-            return True
-        else:
-            self.hide()
+        try:
+            self._clipboard = QApplication.clipboard()
+            if self._clipboard:
+                # 记录当前剪贴板内容，用于后续去重
+                self._last_text = self._clipboard.text()
+                # 连接剪贴板变化信号
+                self._clipboard.dataChanged.connect(self._on_clipboard_changed)
+                self._running = True
+                return True
+            return False
+        except Exception:
             return False
 
     def stop(self):
         """停止监听剪贴板"""
-        if not self._registered:
+        if not self._running:
             return
 
-        hwnd = int(self.winId())
-        RemoveClipboardFormatListener(hwnd)
-        self._registered = False
-        self.hide()
+        try:
+            if self._clipboard:
+                self._clipboard.dataChanged.disconnect(self._on_clipboard_changed)
+        except Exception:
+            pass
 
-    def nativeEvent(self, eventType, message):
-        """处理 Windows 原生消息"""
-        if eventType == b'windows_generic_MSG':
-            msg = ctypes.wintypes.MSG.from_address(int(message))
-            if msg.message == WM_CLIPBOARDUPDATE:
-                # 剪贴板内容已更新，发出信号
+        self._running = False
+        self._clipboard = None
+
+    def _on_clipboard_changed(self):
+        """剪贴板内容变化时的回调"""
+        try:
+            # 获取当前剪贴板文本
+            current_text = self._clipboard.text() if self._clipboard else None
+
+            # 检查内容是否真的变化了（去重）
+            if current_text != self._last_text:
+                self._last_text = current_text
                 self.clipboard_changed.emit()
-                return True, 0
+        except Exception:
+            # 即使出错也发出信号，让上层处理
+            self.clipboard_changed.emit()
 
-        return super().nativeEvent(eventType, message)
-
-    def closeEvent(self, event):
-        """关闭时停止监听"""
-        self.stop()
-        super().closeEvent(event)
+    def is_running(self):
+        """检查监听器是否正在运行"""
+        return self._running

@@ -1,5 +1,13 @@
+# 通用依赖
 PyQt5>=5.15.0
 pynput>=1.7.6
 pyperclip>=1.8.2
-pywin32>=311
+
+# macOS 特定依赖
+pyobjc-core>=9.0
+pyobjc-framework-Cocoa>=9.0
+pyobjc-framework-Quartz>=9.0
+
+# 打包工具
 PyInstaller>=6.0.0
+# py2app>=0.28.0  # macOS 专用打包工具（可选）
