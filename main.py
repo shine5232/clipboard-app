@@ -532,31 +532,94 @@ class ClipboardWindow(QWidget):
             pass  # 处理剪贴板变化失败
 
     def register_hotkeys(self):
-        """注册全局快捷键（跨平台）"""
+        """注册全局快捷键 - 使用 macOS Quartz Event Tap"""
+        try:
+            import Quartz
+            from Foundation import NSObject
+            import threading
+
+            # macOS 修饰键掩码
+            kCGEventFlagMaskCommand = 1 << 20   # 0x100000
+            kCGEventFlagMaskShift = 1 << 17     # 0x020000
+            kCGEventFlagMaskControl = 1 << 18   # 0x040000
+
+            # macOS 虚拟键码
+            kVK_V = 0x09    # V 键
+            kVK_C = 0x08    # C 键
+            kVK_Q = 0x0C    # Q 键
+
+            def hotkey_callback(proxy, event_type, event, refcon):
+                """Quartz 事件回调"""
+                if event_type == Quartz.kCGEventKeyDown:
+                    keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
+                    flags = Quartz.CGEventGetFlags(event)
+
+                    has_cmd = bool(flags & kCGEventFlagMaskCommand)
+                    has_shift = bool(flags & kCGEventFlagMaskShift)
+                    has_ctrl = bool(flags & kCGEventFlagMaskControl)
+
+                    # Ctrl+Cmd+V → 批量粘贴
+                    if keycode == kVK_V and has_cmd and has_ctrl and not has_shift:
+                        self.do_paste_signal.emit()
+
+                    # Cmd+Shift+C → 显示/隐藏
+                    elif keycode == kVK_C and has_cmd and has_shift and not has_ctrl:
+                        self.toggle_window_signal.emit()
+
+                    # Cmd+Shift+Q → 退出
+                    elif keycode == kVK_Q and has_cmd and has_shift and not has_ctrl:
+                        self.quit_app_signal.emit()
+
+                return event
+
+            # 创建 Event Tap
+            tap = Quartz.CGEventTapCreate(
+                Quartz.kCGSessionEventTap,
+                Quartz.kCGHeadInsertEventTap,
+                Quartz.kCGEventTapOptionListenOnly,
+                Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown),
+                hotkey_callback,
+                None
+            )
+
+            if tap is None:
+                # Event Tap 创建失败（无辅助功能权限），回退到 pynput
+                self._register_hotkeys_fallback()
+                return
+
+            run_loop_source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
+
+            def run_event_tap():
+                run_loop = Quartz.CFRunLoopGetCurrent()
+                Quartz.CFRunLoopAddSource(run_loop, run_loop_source, Quartz.kCFRunLoopDefaultMode)
+                Quartz.CGEventTapEnable(tap, True)
+                Quartz.CFRunLoopRun()
+
+            self._event_tap = tap
+            self._event_tap_source = run_loop_source
+            self._event_tap_thread = threading.Thread(target=run_event_tap, daemon=True)
+            self._event_tap_thread.start()
+
+        except ImportError:
+            # pyobjc 未安装，回退到 pynput
+            self._register_hotkeys_fallback()
+        except Exception:
+            self._register_hotkeys_fallback()
+
+    def _register_hotkeys_fallback(self):
+        """回退方案：使用 pynput GlobalHotKeys"""
         try:
             from pynput.keyboard import GlobalHotKeys
 
-            def on_paste_hotkey():
-                # 使用信号确保在主线程执行
-                self.do_paste_signal.emit()
-
-            def on_toggle_hotkey():
-                self.toggle_window_signal.emit()
-
-            def on_quit_hotkey():
-                self.quit_app_signal.emit()
-
-            # macOS 快捷键配置
             hotkeys = {
-                '<cmd>+<ctrl>+v': on_paste_hotkey,      # Cmd+Ctrl+V 粘贴
-                '<cmd>+<shift>+c': on_toggle_hotkey,    # Cmd+Shift+C 显示/隐藏
-                '<cmd>+<shift>+q': on_quit_hotkey       # Cmd+Shift+Q 退出
+                '<cmd>+<ctrl>+v': lambda: self.do_paste_signal.emit(),
+                '<cmd>+<shift>+c': lambda: self.toggle_window_signal.emit(),
+                '<cmd>+<shift>+q': lambda: self.quit_app_signal.emit()
             }
-
             self.hotkey_listener = GlobalHotKeys(hotkeys)
             self.hotkey_listener.start()
         except Exception:
-            pass  # 快捷键注册失败
+            pass
 
     def do_paste(self):
         """执行批量粘贴：自动粘贴到当前位置"""
@@ -832,7 +895,7 @@ class ClipboardWindow(QWidget):
         self.tray_icon.show()
 
         # 设置快捷键提示
-        self.tray_icon.setToolTip('剪贴板助手\nCmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出')
+        self.tray_icon.setToolTip('剪贴板助手\nCmd+Shift+C: 显示/隐藏\nCtrl+Cmd+V: 批量粘贴\nCmd+Shift+Q: 退出')
 
     def init_context_menu(self):
         """初始化主窗口右键菜单"""
@@ -1396,11 +1459,18 @@ class ClipboardWindow(QWidget):
         if hasattr(self, 'clipboard_check_timer'):
             self.clipboard_check_timer.stop()
 
+        # 停止全局快捷键监听
         if hasattr(self, 'hotkey_listener'):
             try:
                 self.hotkey_listener.stop()
             except Exception:
-                pass  # 停止快捷键监听器失败
+                pass
+        if hasattr(self, '_event_tap') and self._event_tap:
+            try:
+                import Quartz
+                Quartz.CGEventTapEnable(self._event_tap, False)
+            except Exception:
+                pass
 
         QApplication.quit()
 
@@ -1448,7 +1518,7 @@ def main():
 
     # 显示快捷键提示
     if hasattr(window, 'tray_icon') and window.tray_icon:
-        tip_message = 'Cmd+Shift+C: 显示/隐藏\nCmd+Ctrl+V: 批量粘贴\nCmd+Shift+Q: 退出'
+        tip_message = 'Cmd+Shift+C: 显示/隐藏\nCtrl+Cmd+V: 批量粘贴\nCmd+Shift+Q: 退出'
 
         window.tray_icon.showMessage(
             '剪贴板助手已启动',

@@ -28,7 +28,8 @@
       "Bash(powershell -Command \"python ''E:\\clipboard-app\\main.py''\")",
       "Bash(powershell -Command \"Start-Sleep -Seconds 5\")",
       "Bash(powershell -Command \"Test-Path ''C:\\Users\\asus\\AppData\\Roaming\\ClipboardHelper''\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

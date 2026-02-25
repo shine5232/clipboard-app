@@ -81,7 +81,7 @@ python main.py
 - 重复内容会自动去重
 
 #### 2. 批量粘贴
-- 按下全局快捷键 `Cmd+Ctrl+V`
+- 按下全局快捷键 `Ctrl+Cmd+V`
 
 #### 3. 输出模式
 - **逗号拼接**: 将所有内容用逗号连接后粘贴
@@ -107,7 +107,7 @@ python main.py
 
 | 快捷键 | 功能 |
 |-------|------|
-| `Cmd+Ctrl+V` | 批量粘贴 |
+| `Ctrl+Cmd+V` | 批量粘贴 |
 | `Cmd+Shift+C` | 显示/隐藏主窗口 |
 | `Cmd+Shift+Q` | 退出程序 |
 
@@ -161,8 +161,8 @@ python main.py
 |------|------|
 | **PyQt5** | GUI 界面框架 |
 | **QClipboard** | 剪贴板读写 |
-| **pynput** | 全局快捷键监听与键盘模拟 |
-| **pyobjc** | macOS 原生 API 调用 |
+| **pynput** | 键盘模拟 |
+| **pyobjc (Quartz)** | 全局快捷键监听、macOS 原生 API 调用 |
 | **json** | 数据持久化存储 |
 
 ---
@@ -235,16 +235,16 @@ pip install -r requirements.txt
 
 2. **顺序输出模式**
    ```
-   第一次 Cmd+Ctrl+V: apple
-   第二次 Cmd+Ctrl+V: banana
-   第三次 Cmd+Ctrl+V: cherry
+   第一次 Ctrl+Cmd+V: apple
+   第二次 Ctrl+Cmd+V: banana
+   第三次 Ctrl+Cmd+V: cherry
    ```
 
 3. **倒序输出模式**
    ```
-   第一次 Cmd+Ctrl+V: cherry
-   第二次 Cmd+Ctrl+V: banana
-   第三次 Cmd+Ctrl+V: apple
+   第一次 Ctrl+Cmd+V: cherry
+   第二次 Ctrl+Cmd+V: banana
+   第三次 Ctrl+Cmd+V: apple
    ```
 
 ### 主题设置
@@ -309,7 +309,7 @@ clipboard-app-mac/
 - **GUI 框架**: PyQt5
 - **动画引擎**: QPropertyAnimation
 - **剪贴板**: Qt QClipboard
-- **快捷键**: pynput
+- **快捷键**: pyobjc Quartz Event Tap (pynput 备用)
 - **窗口管理**: pyobjc (AppKit)
 
 ### 架构设计
@@ -390,7 +390,7 @@ clipboard-app-mac/
 - ✅ 胶囊模式（边缘吸附/双击标题栏）
 - ✅ 主题系统（日间/暗夜模式 + 4种配色）
 - ✅ 自动检测 macOS 系统主题
-- ✅ 全局快捷键 (Cmd+Ctrl+V, Cmd+Shift+C, Cmd+Shift+Q)
+- ✅ 全局快捷键 (Ctrl+Cmd+V, Cmd+Shift+C, Cmd+Shift+Q)
 - ✅ 菜单栏集成
 - ✅ Retina 显示屏支持
 - ✅ 使用 pyobjc 进行原生 macOS API 调用
